@@ -958,6 +958,22 @@ function tekenCloud() {
     return;
   }
 
+  if (!Cloud.team) {
+    $('#cloud-uitleg').textContent = 'Je bent aangemeld, maar er is nog geen gedeelde voorraad.';
+    status.innerHTML = `<table class="tabel-mini"><tr><td>Aangemeld als</td><td>${ontsnap(Cloud.sessie.email)}</td></tr></table>`;
+    const maak = document.createElement('button');
+    maak.className = 'knop';
+    maak.textContent = 'Gedeelde voorraad instellen';
+    maak.onclick = () => { $('#team-naam').value = Cloud.naam || ''; $('#modal-team').hidden = false; };
+    knoppen.appendChild(maak);
+    const af0 = document.createElement('button');
+    af0.className = 'knop knop--leeg';
+    af0.textContent = 'Afmelden';
+    af0.onclick = async () => { await Cloud.meldAf(); Store.gebruiker = ''; tekenCloud(); };
+    knoppen.appendChild(af0);
+    return;
+  }
+
   $('#cloud-uitleg').textContent = 'De voorraad wordt automatisch bewaard in de cloud en gedeeld met je team.';
   const sync = Cloud.laatsteSync
     ? Cloud.laatsteSync.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })

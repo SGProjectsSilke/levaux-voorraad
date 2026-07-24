@@ -1697,19 +1697,24 @@ const Cloud = {
     return this.team;
   },
 
-  /** Eerste keer: een eigen team aanmaken. */
+  /** Eerste keer: een eigen team aanmaken.
+      We verzinnen de teamcode zelf. Zou de databank hem maken, dan moesten
+      we hem meteen terugvragen — en dat mag nog niet, want op dat moment
+      ben je nog geen lid van je eigen team. */
   async maakTeam(teamnaam, mijnNaam) {
-    const teams = await this._vraag('/rest/v1/teams', {
+    const id = nieuweCode();
+    const naam = teamnaam || 'Levaux Bouw';
+    await this._vraag('/rest/v1/teams', {
       method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ naam: teamnaam || 'Levaux Bouw' })
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ id, naam })
     });
-    const team = teams[0];
     await this._vraag('/rest/v1/leden', {
       method: 'POST',
-      body: JSON.stringify({ team: team.id, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ team: id, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
     });
-    this.team = { id: team.id, naam: team.naam };
+    this.team = { id, naam };
     this.naam = mijnNaam || this.sessie.email;
     return this.team;
   },
@@ -1718,10 +1723,18 @@ const Cloud = {
   async sluitAan(teamcode, mijnNaam) {
     const code = String(teamcode || '').trim();
     if (!/^[0-9a-f-]{36}$/i.test(code)) throw new Error('Dat is geen geldige teamcode.');
-    await this._vraag('/rest/v1/leden', {
-      method: 'POST',
-      body: JSON.stringify({ team: code, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
-    });
+    try {
+      await this._vraag('/rest/v1/leden', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ team: code, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
+      });
+    } catch (e) {
+      if (/beveiligingsregel|foreign key|violates/i.test(e.message)) {
+        throw new Error('Die teamcode bestaat niet. Kopieer hem bij Instellingen → Cloud op het andere toestel.');
+      }
+      throw e;
+    }
     return this.zoekTeam();
   },
 
@@ -1745,13 +1758,23 @@ const Cloud = {
   }
 };
 
+/** Een eigen teamcode (uuid), ook op oudere browsers. */
+function nieuweCode() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /** Supabase antwoordt in het Engels; de gebruiker leest Nederlands. */
 function vertaal(m) {
   const t = String(m).toLowerCase();
   if (t.includes('invalid login')) return 'E-mailadres of wachtwoord klopt niet.';
   if (t.includes('email not confirmed')) return 'Dit e-mailadres is nog niet bevestigd. Kijk je mailbox na.';
   if (t.includes('duplicate key')) return 'Je bent al lid van dit team.';
-  if (t.includes('violates row-level security')) return 'Geen toegang — klopt de teamcode?';
+  if (t.includes('violates row-level security')) return 'De databank weigert dit (beveiligingsregel). Is schema.sql volledig uitgevoerd?';
   if (t.includes('failed to fetch')) return 'Geen verbinding met de cloud.';
   return m;
 }
@@ -3109,6 +3132,22 @@ function tekenCloud() {
     b.textContent = 'Aanmelden';
     b.onclick = () => { $('#modal-login').hidden = false; };
     knoppen.appendChild(b);
+    return;
+  }
+
+  if (!Cloud.team) {
+    $('#cloud-uitleg').textContent = 'Je bent aangemeld, maar er is nog geen gedeelde voorraad.';
+    status.innerHTML = `<table class="tabel-mini"><tr><td>Aangemeld als</td><td>${ontsnap(Cloud.sessie.email)}</td></tr></table>`;
+    const maak = document.createElement('button');
+    maak.className = 'knop';
+    maak.textContent = 'Gedeelde voorraad instellen';
+    maak.onclick = () => { $('#team-naam').value = Cloud.naam || ''; $('#modal-team').hidden = false; };
+    knoppen.appendChild(maak);
+    const af0 = document.createElement('button');
+    af0.className = 'knop knop--leeg';
+    af0.textContent = 'Afmelden';
+    af0.onclick = async () => { await Cloud.meldAf(); Store.gebruiker = ''; tekenCloud(); };
+    knoppen.appendChild(af0);
     return;
   }
 
