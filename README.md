@@ -13,7 +13,7 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
 - **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen. Je hoeft niets in te stellen
 - **Bulk verwijderen** — selectiestand in de voorraadlijst; "Alles" werkt op wat er na je filters overblijft
-- **Minimums aanpasbaar** — de aantallen per soort staan bij Instellingen en zijn te wijzigen; producten die op die regel draaien volgen meteen mee
+- **Minimums volledig automatisch** — elk nieuw product krijgt zijn minimum uit de regels, ook bij een bestelbon of na het hernoemen van een product. De aantallen per soort pas je aan bij Instellingen; alle producten van dat soort volgen meteen mee. Alleen een minimum dat je bij één product zelf instelt blijft met rust
 - **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
 - **Eigen materiaal** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
 - **Eenheden** — stuk, m, m², zak, pallet, rol, kg, doos, liter
@@ -152,7 +152,7 @@ Opgeslagen gegevens van een oudere versie worden automatisch bijgewerkt (`migree
 
 ### Minimumregels
 
-`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De standaardaantallen staan daar; wijzigt de gebruiker er één, dan komt dat in `staat.minima` onder de sleutel van de regel — de code blijft dus de bron van de regels, de gebruiker die van de aantallen. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld; "Regels opnieuw toepassen" bij Instellingen laat de zelf ingestelde met rust, tenzij je uitdrukkelijk anders kiest.
+`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De standaardaantallen staan daar; wijzigt de gebruiker er één, dan komt dat in `staat.minima` onder de sleutel van de regel — de code blijft dus de bron van de regels, de gebruiker die van de aantallen. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld. Er is geen knop om regels "opnieuw toe te passen": ze worden automatisch toegepast bij het aanmaken van een product, bij het hernoemen ervan en zodra je bij Instellingen een aantal wijzigt. Alleen een product met `minAuto === false` (de gebruiker vulde zelf een minimum in) blijft buiten schot.
 
 Nieuwe soorten toevoegen: één regel bij in de lijst (met een eigen `key`), `DATAVERSIE` verhogen en in `migreer()` de regels opnieuw laten lopen.
 

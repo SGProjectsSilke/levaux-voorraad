@@ -350,7 +350,10 @@ export const Store = {
       qty: Number(data.qty) || 0,
       // niets ingevuld? dan geldt de afgesproken regel voor dit soort product
       min: Number(data.min) || regel?.min || 0,
-      minAuto: !Number(data.min) && !!regel,
+      // minAuto = "de gebruiker heeft hier zelf niets ingesteld", ook als er
+      // (nog) geen regel op past. Anders volgt het product later niet mee
+      // wanneer de naam verandert of er een regel bijkomt.
+      minAuto: !Number(data.min),
       price: Number(data.price) || 0,
       cat: data.cat || '',
       hoofdcat: data.hoofdcat || this.catVanLeverancier(leverancier),
@@ -370,8 +373,17 @@ export const Store = {
     if (!p) return;
     const oudAantal = p.qty;
     if (velden.min !== undefined && Number(velden.min) !== p.min) p.minAuto = false;
+    const naamWijzigt = (velden.name !== undefined && velden.name !== p.name)
+                     || (velden.brand !== undefined && velden.brand !== p.brand);
     Object.assign(p, velden);
     if (velden.ref !== undefined) p.refKey = normRef(velden.ref);
+
+    // Andere naam kan een ander soort product betekenen: dan geldt de regel
+    // van dat soort weer — tenzij je het minimum zelf hebt ingesteld.
+    if (naamWijzigt && p.minAuto !== false) {
+      const regel = this.regelVoor(p.brand, p.name);
+      if (regel) { p.min = regel.min; p.minAuto = true; }
+    }
     p.qty = Math.max(0, Number(p.qty) || 0);
     p.gewijzigd = new Date().toISOString();
     if (velden.qty !== undefined && p.qty !== oudAantal) {

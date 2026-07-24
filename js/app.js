@@ -1004,16 +1004,6 @@ function bindInstellingen() {
     melding('Leverancier toegevoegd.');
   });
 
-  $('#btn-regels-toepassen').addEventListener('click', async () => {
-    const ookHandmatig = confirm(
-      'Regels opnieuw toepassen.\n\n' +
-      'OK = ook de minimums die je zelf hebt ingesteld overschrijven\n' +
-      'Annuleren = enkel de automatische minimums bijwerken'
-    );
-    const n = await Store.pasRegelsToe({ ookHandmatig });
-    melding(n ? `${n} product${n === 1 ? '' : 'en'} bijgewerkt.` : 'Alles stond al goed.');
-  });
-
   $('#btn-backup').addEventListener('click', () => {
     download('levaux-voorraad-backup-' + datumStempel() + '.json', Store.exportJson(), 'application/json');
     melding('Back-up gedownload.');
