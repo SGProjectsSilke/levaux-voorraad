@@ -46,7 +46,9 @@ export const Cloud = {
       'Content-Type': 'application/json',
       ...(opties.headers || {})
     };
-    if (metToken && this.sessie?.access_token) kop.Authorization = 'Bearer ' + this.sessie.access_token;
+    // Zonder aanmelding stuurt Supabase je door als "anon"; met een sessie
+    // ben je jezelf. In beide gevallen wil PostgREST een Authorization-kop.
+    kop.Authorization = 'Bearer ' + ((metToken && this.sessie?.access_token) || c.supabaseKey);
 
     const roep = async () => {
       try {

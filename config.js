@@ -7,17 +7,19 @@
    toestellen.
 
    De twee waarden vind je in Supabase onder
-   Project Settings → API:
+   Project Settings → API Keys:
      - Project URL
-     - anon public key   (de publieke sleutel, geen service key!)
+     - de publieke sleutel: "anon public" of "publishable"
 
-   Deze sleutel mag in de code staan: hij geeft op zichzelf
-   geen toegang. De beveiliging zit in de regels op de tabellen
-   (zie supabase/schema.sql), waardoor je enkel bij de voorraad
-   van je eigen team kan nadat je bent aangemeld.
+   Die sleutel mag in de code staan: hij geeft op zichzelf geen
+   toegang. De beveiliging zit in de regels op de tabellen (zie
+   supabase/schema.sql), waardoor je enkel bij de voorraad van
+   je eigen team kan nadat je bent aangemeld.
+
+   De "service_role" of "secret" key hoort hier NOOIT in.
    =========================================================== */
 
 window.LEVAUX_CONFIG = {
-  supabaseUrl: '',
-  supabaseKey: ''
+  supabaseUrl: 'https://faenaisbfvctszplivtk.supabase.co',
+  supabaseKey: 'sb_publishable_pIAD5kyACvmJaQQzAWV80A_OhNQwMlc'
 };
