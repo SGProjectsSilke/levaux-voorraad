@@ -10,8 +10,8 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.7.0';
-const DATAVERSIE = 6;
+export const VERSIE = '1.8.0';
+const DATAVERSIE = 7;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
@@ -32,12 +32,20 @@ export const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos
    specifieke bovenaan.
 ------------------------------------------------------------ */
 
+/* Op een bestelbon staat het even vaak voluit als afgekort: "Differentieel",
+   "Differentieelschakelaar", "Diff. 30mA". Eén herkenner voor alledrie. */
+const isDiff = t => /differentie/.test(t) || /\bdiff\.?\b/.test(t);
+
 export const MINIMUMREGELS = [
-  { key: 'diff300',     label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
-  { key: 'diff30',      label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
+  { key: 'diff300',     label: 'Differentieel 300mA', min: 5,  test: t => isDiff(t) && /300\s*ma/.test(t) },
+  { key: 'diff30',      label: 'Differentieel 30mA',  min: 10, test: t => isDiff(t) && /(^|[^0])30\s*ma/.test(t) },
   { key: 'hydrodoos',   label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
   { key: 'inbouwdoos',  label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
   { key: 'automaat',    label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  // Vangnet: staat er "differentieel" zonder dat er 30 of 300 mA bij staat,
+  // dan geldt dit aantal. Bewust ná 'automaat', zodat een
+  // differentieelautomaat bij de automaten blijft horen.
+  { key: 'diff',        label: 'Differentieel (rest)', min: 10, test: isDiff },
   { key: 'afdekplaat',  label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
   { key: 'stopcontact', label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
   { key: 'toets',       label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
@@ -217,6 +225,16 @@ function migreer(staat) {
   if (staat.versie < 6) {
     staat.minima = staat.minima || {};
     staat.versie = 6;
+  }
+  // Er is een regel bijgekomen ("Differentieel (rest)"). Producten die nog geen
+  // eigen minimum hebben gekregen, laten we ze opnieuw langs de regels lopen.
+  if (staat.versie < 7) {
+    staat.producten.forEach(p => {
+      if (p.minAuto === false) return;
+      const regel = zoekRegel(p.brand, p.name);
+      if (regel) { p.min = staat.minima?.[regel.key] ?? regel.min; p.minAuto = true; }
+    });
+    staat.versie = 7;
   }
   return staat;
 }
