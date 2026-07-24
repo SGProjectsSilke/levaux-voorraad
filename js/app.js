@@ -2,7 +2,7 @@
    app.js — schermen en interactie
    =========================================================== */
 
-import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat } from './store.js';
+import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat, MINIMUMREGELS, regelVoor } from './store.js';
 import { leesAfbeeldingen, herlees, parseer, parseerKaarten, parseerTabel, haalFotos, haalOrdernummer, raadLeverancier } from './ocr.js';
 import { Cloud } from './cloud.js';
 
@@ -84,6 +84,7 @@ async function start() {
   $('#versie').textContent = 'v' + VERSIE;
 
   bindNavigatie();
+  bindFotoviewer();
   bindVoorraad();
   bindProductModal();
   bindBewerkModal();
@@ -113,6 +114,21 @@ async function start() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+/* ---------- Foto groot bekijken --------------------------- */
+
+function toonFoto(bron) {
+  if (!bron) return;
+  $('#fotoviewer-beeld').src = bron;
+  $('#fotoviewer').hidden = false;
+}
+
+function bindFotoviewer() {
+  const sluit = () => { $('#fotoviewer').hidden = true; $('#fotoviewer-beeld').src = ''; };
+  $('#fotoviewer').addEventListener('click', sluit);
+  $('#fotoviewer-sluit').addEventListener('click', sluit);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') sluit(); });
 }
 
 /* ---------- Aanmeldpoort ---------------------------------- */
@@ -158,6 +174,7 @@ function tekenAlles() {
   tekenHistoriek();
   tekenLeveranciers();
   tekenBadge();
+  tekenRegels();
   tekenOpslag();
 }
 
@@ -231,11 +248,9 @@ function tekenChips() {
   const kiesCat = w => { ui.cat = w; tekenVoorraad(); };
   el.appendChild(chip('Alles', '', ui.cat, kiesCat));
   el.appendChild(chip('Bijbestellen', '__laag', ui.cat, kiesCat));
-  HOOFDCATEGORIEEN.forEach(c => {
-    if (Store.producten().some(p => p.hoofdcat === c.key) || c.key === 'elektra') {
-      el.appendChild(chip(c.label, c.key, ui.cat, kiesCat));
-    }
-  });
+  // altijd alle categorieën tonen, ook de lege — zo weet je meteen
+  // waar iets onder valt als je het toevoegt
+  HOOFDCATEGORIEEN.forEach(c => el.appendChild(chip(c.label, c.key, ui.cat, kiesCat)));
 
   // rij 2: leveranciers — enkel zinvol zodra er meer dan één is
   const lev = Store.gebruikteLeveranciers();
@@ -351,7 +366,10 @@ function opendProduct(pid) {
   const p = Store.viaId(pid);
   if (!p) return;
   ui.productId = pid;
-  $('#m-foto').innerHTML = p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p);
+  const mf = $('#m-foto');
+  mf.innerHTML = p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p);
+  mf.classList.toggle('foto-klikbaar', !!p.foto);
+  mf.onclick = () => toonFoto(p.foto);
   $('#m-merk').textContent = p.brand;
   $('#m-naam').textContent = p.name;
   $('#m-ref').innerHTML = `<b>${ontsnap(p.ref)}</b>${p.leverancier ? ' · ' + ontsnap(p.leverancier) : ''}`
@@ -410,6 +428,17 @@ function bindBewerkModal() {
     if (!bewerkId) $('#b-hoofdcat').value = Store.catVanLeverancier(e.target.value);
   });
 
+  $('#b-naam').addEventListener('input', () => {
+    tekenLijktOp();
+    // het afgesproken minimum meteen invullen, zolang je er zelf nog niets zette
+    const veld = $('#b-min');
+    if (!bewerkId && (!veld.value || veld.value === '0' || veld.dataset.auto === '1')) {
+      const regel = regelVoor($('#b-merk').value, $('#b-naam').value);
+      veld.value = regel ? regel.min : 0;
+      veld.dataset.auto = '1';
+    }
+  });
+  $('#b-min').addEventListener('input', e => { e.target.dataset.auto = ''; });
   $('#b-annuleer').addEventListener('click', () => { $('#modal-bewerk').hidden = true; });
   $('#b-bewaar').addEventListener('click', bewaarBewerk);
   $('#b-verwijder').addEventListener('click', async () => {
@@ -428,6 +457,33 @@ function bindBewerkModal() {
   });
 }
 
+/** Toont bestaande producten met een gelijkaardige naam. */
+function tekenLijktOp() {
+  const el = $('#b-lijkt-op');
+  const naam = $('#b-naam').value.trim();
+  const lijst = naam.length >= 4 ? Store.gelijkaardig(naam, bewerkId || '') : [];
+  el.hidden = !lijst.length;
+  if (!lijst.length) return;
+
+  el.innerHTML = `<div class="lijkt-op__kop">Lijkt op ${lijst.length === 1 ? 'een product' : lijst.length + ' producten'} die je al hebt:</div>` +
+    lijst.map(p => `
+      <button type="button" data-id="${p.id}">
+        <span class="lijkt-op__foto">${p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p)}</span>
+        <span class="lijkt-op__tekst">
+          <span class="lijkt-op__naam">${ontsnap([p.brand, p.name].filter(Boolean).join(' '))}</span>
+          <span class="lijkt-op__meta">${p.qty} in voorraad · ${ontsnap(p.ref)}${p.leverancier ? ' · ' + ontsnap(p.leverancier) : ''}</span>
+        </span>
+      </button>`).join('');
+
+  el.onclick = e => {
+    const knop = e.target.closest('button[data-id]');
+    if (!knop) return;
+    if (!confirm('Dit product bestaat al. Wil je het bestaande openen om bij te tellen?')) return;
+    $('#modal-bewerk').hidden = true;
+    opendProduct(knop.dataset.id);
+  };
+}
+
 function tekenFotoVoorbeeld() {
   const el = $('#b-voorbeeld');
   el.innerHTML = bewerkFoto
@@ -435,6 +491,8 @@ function tekenFotoVoorbeeld() {
     : svg('<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/>');
   $('#b-foto-weg').hidden = !bewerkFoto;
   $('#b-foto-knop').textContent = bewerkFoto ? 'Andere foto' : 'Foto nemen';
+  el.classList.toggle('foto-klikbaar', !!bewerkFoto);
+  el.onclick = () => toonFoto(bewerkFoto);
 }
 
 function openBewerk(pid, metCamera = false) {
@@ -481,6 +539,8 @@ async function bewaarBewerk() {
   if (bewerkId) {
     if (!velden.ref) delete velden.ref;                 // bestaande referentie behouden
     await Store.bewerkProduct(bewerkId, velden);
+  } else if (!await geenDubbel(velden.name)) {
+    return;
   } else {
     const dubbel = velden.ref && Store.viaRef(velden.ref);
     if (dubbel) return melding('Deze Ref Cebeo bestaat al: ' + dubbel.name.slice(0, 30));
@@ -488,6 +548,29 @@ async function bewaarBewerk() {
   }
   $('#modal-bewerk').hidden = true;
   melding('Bewaard.');
+}
+
+/**
+ * Bestaat er al iets met (bijna) dezelfde naam? Dan eerst vragen wat de
+ * bedoeling is: bijtellen bij het bestaande product, of toch een nieuw
+ * product aanmaken.
+ * @returns {Promise<boolean>} true = doorgaan met een nieuw product
+ */
+async function geenDubbel(naam) {
+  const lijst = Store.gelijkaardig(naam);
+  if (!lijst.length) return true;
+  const p = lijst[0];
+  const bijtellen = confirm(
+    `"${[p.brand, p.name].filter(Boolean).join(' ')}" staat al in je voorraad (${p.qty} stuks).\n\n` +
+    'OK = dat product openen om bij te tellen\n' +
+    'Annuleren = toch een nieuw product aanmaken'
+  );
+  if (bijtellen) {
+    $('#modal-bewerk').hidden = true;
+    opendProduct(p.id);
+    return false;
+  }
+  return true;
 }
 
 /** Verkleint naar max 320px en slaat op als JPEG — anders loopt localStorage vol. */
@@ -860,6 +943,16 @@ function bindInstellingen() {
     melding('Leverancier toegevoegd.');
   });
 
+  $('#btn-regels-toepassen').addEventListener('click', async () => {
+    const ookHandmatig = confirm(
+      'Regels opnieuw toepassen.\n\n' +
+      'OK = ook de minimums die je zelf hebt ingesteld overschrijven\n' +
+      'Annuleren = enkel de automatische minimums bijwerken'
+    );
+    const n = await Store.pasRegelsToe({ ookHandmatig });
+    melding(n ? `${n} product${n === 1 ? '' : 'en'} bijgewerkt.` : 'Alles stond al goed.');
+  });
+
   $('#btn-backup').addEventListener('click', () => {
     download('levaux-voorraad-backup-' + datumStempel() + '.json', Store.exportJson(), 'application/json');
     melding('Back-up gedownload.');
@@ -891,6 +984,13 @@ function bindInstellingen() {
     melding('Alles gewist.');
     toon('voorraad');
   });
+}
+
+function tekenRegels() {
+  const el = $('#regel-lijst');
+  if (!el) return;
+  el.innerHTML = MINIMUMREGELS.map(r =>
+    `<div class="regelrij"><span>${ontsnap(r.label)}</span><b>${r.min}</b></div>`).join('');
 }
 
 function tekenOpslag() {

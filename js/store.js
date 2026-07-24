@@ -10,18 +10,51 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.3.0';
-const DATAVERSIE = 3;
+export const VERSIE = '1.5.0';
+const DATAVERSIE = 4;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
   { key: 'elektra',    label: 'Elektra' },
   { key: 'sanitair',   label: 'Chauffage & Sanitair' },
   { key: 'ruwbouw',    label: 'Ruwbouw' },
+  { key: 'hout',       label: 'Hout' },
   { key: 'materialen', label: 'Gebruiksmaterialen' }
 ];
 
 export const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'liter'];
+
+/* --- Minimumvoorraad per soort product ---------------------
+   Cédric heeft per soort materiaal bepaald wanneer hij wil
+   bijbestellen. Deze regels gelden ook voor producten die er
+   later bijkomen, zodat hij dat niet elke keer moet invullen.
+   De eerste regel die past wint, dus staat het meest
+   specifieke bovenaan.
+------------------------------------------------------------ */
+
+export const MINIMUMREGELS = [
+  { label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
+  { label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
+  { label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
+  { label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
+  { label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  { label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
+  { label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
+  { label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
+  { label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
+  { label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
+  { label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
+  { label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
+];
+
+/**
+ * Zoekt het afgesproken minimum bij een productnaam.
+ * @returns {{min:number, label:string}|null}
+ */
+export function regelVoor(...delen) {
+  const t = delen.filter(Boolean).join(' ').toLowerCase();
+  return MINIMUMREGELS.find(r => r.test(t)) || null;
+}
 
 export const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Gebruiksmaterialen';
 
@@ -166,6 +199,13 @@ function migreer(staat) {
     }
     staat.versie = 3;
   }
+  if (staat.versie < 4) {
+    staat.producten.forEach(p => {
+      const regel = regelVoor(p.brand, p.name);
+      if (regel) { p.min = regel.min; p.minAuto = true; }
+    });
+    staat.versie = 4;
+  }
   return staat;
 }
 
@@ -198,6 +238,7 @@ export const Store = {
       const seed = window.__SEED__ || await fetch(seedUrl).then(r => r.json());
       const nu = new Date().toISOString();
       seed.products.forEach(p => {
+        const regel = regelVoor(p.brand, p.name);
         this.staat.producten.push({
           id: id(),
           ref: p.ref,
@@ -205,7 +246,8 @@ export const Store = {
           brand: p.brand,
           name: p.name,
           qty: p.qty,
-          min: p.min ?? 0,
+          min: regel?.min ?? p.min ?? 0,
+          minAuto: !!regel,
           price: p.price ?? 0,
           cat: p.cat || '',
           hoofdcat: p.hoofdcat || 'elektra',
@@ -283,6 +325,7 @@ export const Store = {
   async voegProductToe(data) {
     const leverancier = data.leverancier || '';
     const ref = data.ref || this.eigenRef(leverancier);
+    const regel = regelVoor(data.brand, data.name);
     const p = {
       id: id(),
       ref,
@@ -290,7 +333,9 @@ export const Store = {
       brand: data.brand || '',
       name: data.name || 'Naamloos product',
       qty: Number(data.qty) || 0,
-      min: Number(data.min) || 0,
+      // niets ingevuld? dan geldt de afgesproken regel voor dit soort product
+      min: Number(data.min) || regel?.min || 0,
+      minAuto: !Number(data.min) && !!regel,
       price: Number(data.price) || 0,
       cat: data.cat || '',
       hoofdcat: data.hoofdcat || this.catVanLeverancier(leverancier),
@@ -309,6 +354,7 @@ export const Store = {
     const p = this.viaId(pid);
     if (!p) return;
     const oudAantal = p.qty;
+    if (velden.min !== undefined && Number(velden.min) !== p.min) p.minAuto = false;
     Object.assign(p, velden);
     if (velden.ref !== undefined) p.refKey = normRef(velden.ref);
     p.qty = Math.max(0, Number(p.qty) || 0);
@@ -396,6 +442,35 @@ export const Store = {
     this.staat.orders.unshift(order);
     await this.bewaar();
     return { bij, nieuw, order };
+  },
+
+  /** Past de minimumregels opnieuw toe. Zelf ingestelde minimums blijven. */
+  async pasRegelsToe({ ookHandmatig = false } = {}) {
+    let n = 0;
+    this.staat.producten.forEach(p => {
+      if (!ookHandmatig && p.minAuto === false) return;
+      const regel = regelVoor(p.brand, p.name);
+      if (regel && p.min !== regel.min) { p.min = regel.min; p.minAuto = true; n++; }
+    });
+    if (n) await this.bewaar();
+    return n;
+  },
+
+  /** Producten met een gelijkaardige naam — om dubbels te vermijden. */
+  gelijkaardig(naam, negeerId = '') {
+    const woorden = String(naam).toLowerCase().replace(/[^a-z0-9à-ÿ ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    if (!woorden.length) return [];
+    return this.staat.producten
+      .filter(p => p.id !== negeerId)
+      .map(p => {
+        const t = (p.brand + ' ' + p.name).toLowerCase();
+        const raak = woorden.filter(w => t.includes(w)).length;
+        return { p, score: raak / woorden.length };
+      })
+      .filter(x => x.score >= 0.6)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(x => x.p);
   },
 
   /* ---------- Leveranciers --------------------------------- */

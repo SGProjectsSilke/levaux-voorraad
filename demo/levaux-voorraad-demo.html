@@ -600,6 +600,73 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 .regel__label--bestaat { color: var(--groen); }
 .regel__weg { width: 30px; height: 30px; border-radius: 50%; background: var(--grijs-100); color: var(--grijs-600); display: grid; place-items: center; }
 
+/* ---------- Foto groot bekijken ---------------------------- */
+
+.fotoviewer {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(15, 15, 15, .92);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: fade .15s ease;
+}
+.fotoviewer img {
+  max-width: 100%; max-height: 100%;
+  border-radius: var(--radius);
+  background: var(--wit);
+}
+.fotoviewer__sluit {
+  position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255, 255, 255, .16); color: var(--wit);
+  font-size: 1.5rem; line-height: 1;
+  display: grid; place-items: center;
+}
+.foto-klikbaar { cursor: zoom-in; position: relative; }
+.foto-klikbaar::after {
+  content: '';
+  position: absolute; right: 3px; bottom: 3px;
+  width: 14px; height: 14px;
+  border-right: 2px solid var(--grijs-400);
+  border-bottom: 2px solid var(--grijs-400);
+  border-bottom-right-radius: 3px;
+  opacity: .8;
+}
+
+/* ---------- Lijkt op een bestaand product ------------------ */
+
+.lijkt-op { margin-top: 8px; }
+.lijkt-op__kop {
+  font-size: .74rem; font-weight: 700; color: var(--oranje);
+  margin-bottom: 6px;
+}
+.lijkt-op button {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; text-align: left;
+  padding: 8px 10px; margin-bottom: 5px;
+  border-radius: var(--radius-s);
+  background: var(--grijs-50);
+  border: 1px solid var(--grijs-200);
+}
+.lijkt-op button:active { background: var(--grijs-100); }
+.lijkt-op__foto {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 6px; overflow: hidden;
+  background: var(--grijs-100);
+  display: grid; place-items: center; color: var(--grijs-400);
+}
+.lijkt-op__foto img { width: 100%; height: 100%; object-fit: contain; }
+.lijkt-op__tekst { min-width: 0; }
+.lijkt-op__naam { display: block; font-size: .8rem; font-weight: 600; line-height: 1.25; }
+.lijkt-op__meta { display: block; font-size: .68rem; color: var(--grijs-600); margin-top: 2px; }
+
+/* regels bij instellingen */
+.regelrij {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--grijs-100);
+  font-size: .84rem;
+}
+.regelrij b { font-variant-numeric: tabular-nums; }
+
 /* ---------- Toast ------------------------------------------ */
 
 .toast {
@@ -801,6 +868,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <div class="paneel">
+      <h3>Minimumvoorraad</h3>
+      <p>Per soort materiaal ligt vast wanneer je wil bijbestellen. Nieuwe producten krijgen dat minimum automatisch. Stel je bij een product zelf een minimum in, dan blijft dat staan.</p>
+      <div id="regel-lijst"></div>
+      <button class="knop knop--leeg" id="btn-regels-toepassen" style="margin-top:12px">Regels opnieuw toepassen</button>
+    </div>
+
+    <div class="paneel">
       <h3>Back-up</h3>
       <p>De voorraad staat op dit toestel. Maak regelmatig een back-upbestand — zeker voor je de browsergegevens wist of van telefoon wisselt.</p>
       <div id="opslag" style="margin-bottom:14px"></div>
@@ -910,7 +984,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
 
-    <div class="veld"><label for="b-naam">Omschrijving</label><input type="text" id="b-naam" placeholder="Snelbouwsteen 14 cm"></div>
+    <div class="veld"><label for="b-naam">Omschrijving</label>
+      <input type="text" id="b-naam" placeholder="Snelbouwsteen 14 cm" autocomplete="off">
+      <div class="lijkt-op" id="b-lijkt-op" hidden></div>
+    </div>
     <div class="rij">
       <div class="veld"><label for="b-hoofdcat">Categorie</label><select id="b-hoofdcat"></select></div>
       <div class="veld"><label for="b-lev">Leverancier</label><select id="b-lev"></select></div>
@@ -973,6 +1050,12 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 </div>
 
+<!-- ============ FOTO GROOT ============ -->
+<div class="fotoviewer" id="fotoviewer" hidden>
+  <img id="fotoviewer-beeld" alt="">
+  <button class="fotoviewer__sluit" id="fotoviewer-sluit" aria-label="Sluiten">&times;</button>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script type="module">
@@ -1030,18 +1113,51 @@ window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-const VERSIE = '1.3.0';
-const DATAVERSIE = 3;
+const VERSIE = '1.5.0';
+const DATAVERSIE = 4;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 const HOOFDCATEGORIEEN = [
   { key: 'elektra',    label: 'Elektra' },
   { key: 'sanitair',   label: 'Chauffage & Sanitair' },
   { key: 'ruwbouw',    label: 'Ruwbouw' },
+  { key: 'hout',       label: 'Hout' },
   { key: 'materialen', label: 'Gebruiksmaterialen' }
 ];
 
 const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'liter'];
+
+/* --- Minimumvoorraad per soort product ---------------------
+   Cédric heeft per soort materiaal bepaald wanneer hij wil
+   bijbestellen. Deze regels gelden ook voor producten die er
+   later bijkomen, zodat hij dat niet elke keer moet invullen.
+   De eerste regel die past wint, dus staat het meest
+   specifieke bovenaan.
+------------------------------------------------------------ */
+
+const MINIMUMREGELS = [
+  { label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
+  { label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
+  { label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
+  { label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
+  { label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  { label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
+  { label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
+  { label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
+  { label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
+  { label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
+  { label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
+  { label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
+];
+
+/**
+ * Zoekt het afgesproken minimum bij een productnaam.
+ * @returns {{min:number, label:string}|null}
+ */
+function regelVoor(...delen) {
+  const t = delen.filter(Boolean).join(' ').toLowerCase();
+  return MINIMUMREGELS.find(r => r.test(t)) || null;
+}
 
 const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Gebruiksmaterialen';
 
@@ -1186,6 +1302,13 @@ function migreer(staat) {
     }
     staat.versie = 3;
   }
+  if (staat.versie < 4) {
+    staat.producten.forEach(p => {
+      const regel = regelVoor(p.brand, p.name);
+      if (regel) { p.min = regel.min; p.minAuto = true; }
+    });
+    staat.versie = 4;
+  }
   return staat;
 }
 
@@ -1218,6 +1341,7 @@ const Store = {
       const seed = window.__SEED__ || await fetch(seedUrl).then(r => r.json());
       const nu = new Date().toISOString();
       seed.products.forEach(p => {
+        const regel = regelVoor(p.brand, p.name);
         this.staat.producten.push({
           id: id(),
           ref: p.ref,
@@ -1225,7 +1349,8 @@ const Store = {
           brand: p.brand,
           name: p.name,
           qty: p.qty,
-          min: p.min ?? 0,
+          min: regel?.min ?? p.min ?? 0,
+          minAuto: !!regel,
           price: p.price ?? 0,
           cat: p.cat || '',
           hoofdcat: p.hoofdcat || 'elektra',
@@ -1303,6 +1428,7 @@ const Store = {
   async voegProductToe(data) {
     const leverancier = data.leverancier || '';
     const ref = data.ref || this.eigenRef(leverancier);
+    const regel = regelVoor(data.brand, data.name);
     const p = {
       id: id(),
       ref,
@@ -1310,7 +1436,9 @@ const Store = {
       brand: data.brand || '',
       name: data.name || 'Naamloos product',
       qty: Number(data.qty) || 0,
-      min: Number(data.min) || 0,
+      // niets ingevuld? dan geldt de afgesproken regel voor dit soort product
+      min: Number(data.min) || regel?.min || 0,
+      minAuto: !Number(data.min) && !!regel,
       price: Number(data.price) || 0,
       cat: data.cat || '',
       hoofdcat: data.hoofdcat || this.catVanLeverancier(leverancier),
@@ -1329,6 +1457,7 @@ const Store = {
     const p = this.viaId(pid);
     if (!p) return;
     const oudAantal = p.qty;
+    if (velden.min !== undefined && Number(velden.min) !== p.min) p.minAuto = false;
     Object.assign(p, velden);
     if (velden.ref !== undefined) p.refKey = normRef(velden.ref);
     p.qty = Math.max(0, Number(p.qty) || 0);
@@ -1416,6 +1545,35 @@ const Store = {
     this.staat.orders.unshift(order);
     await this.bewaar();
     return { bij, nieuw, order };
+  },
+
+  /** Past de minimumregels opnieuw toe. Zelf ingestelde minimums blijven. */
+  async pasRegelsToe({ ookHandmatig = false } = {}) {
+    let n = 0;
+    this.staat.producten.forEach(p => {
+      if (!ookHandmatig && p.minAuto === false) return;
+      const regel = regelVoor(p.brand, p.name);
+      if (regel && p.min !== regel.min) { p.min = regel.min; p.minAuto = true; n++; }
+    });
+    if (n) await this.bewaar();
+    return n;
+  },
+
+  /** Producten met een gelijkaardige naam — om dubbels te vermijden. */
+  gelijkaardig(naam, negeerId = '') {
+    const woorden = String(naam).toLowerCase().replace(/[^a-z0-9à-ÿ ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    if (!woorden.length) return [];
+    return this.staat.producten
+      .filter(p => p.id !== negeerId)
+      .map(p => {
+        const t = (p.brand + ' ' + p.name).toLowerCase();
+        const raak = woorden.filter(w => t.includes(w)).length;
+        return { p, score: raak / woorden.length };
+      })
+      .filter(x => x.score >= 0.6)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(x => x.p);
   },
 
   /* ---------- Leveranciers --------------------------------- */
@@ -2405,6 +2563,7 @@ async function start() {
   $('#versie').textContent = 'v' + VERSIE;
 
   bindNavigatie();
+  bindFotoviewer();
   bindVoorraad();
   bindProductModal();
   bindBewerkModal();
@@ -2434,6 +2593,21 @@ async function start() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+/* ---------- Foto groot bekijken --------------------------- */
+
+function toonFoto(bron) {
+  if (!bron) return;
+  $('#fotoviewer-beeld').src = bron;
+  $('#fotoviewer').hidden = false;
+}
+
+function bindFotoviewer() {
+  const sluit = () => { $('#fotoviewer').hidden = true; $('#fotoviewer-beeld').src = ''; };
+  $('#fotoviewer').addEventListener('click', sluit);
+  $('#fotoviewer-sluit').addEventListener('click', sluit);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') sluit(); });
 }
 
 /* ---------- Aanmeldpoort ---------------------------------- */
@@ -2479,6 +2653,7 @@ function tekenAlles() {
   tekenHistoriek();
   tekenLeveranciers();
   tekenBadge();
+  tekenRegels();
   tekenOpslag();
 }
 
@@ -2552,11 +2727,9 @@ function tekenChips() {
   const kiesCat = w => { ui.cat = w; tekenVoorraad(); };
   el.appendChild(chip('Alles', '', ui.cat, kiesCat));
   el.appendChild(chip('Bijbestellen', '__laag', ui.cat, kiesCat));
-  HOOFDCATEGORIEEN.forEach(c => {
-    if (Store.producten().some(p => p.hoofdcat === c.key) || c.key === 'elektra') {
-      el.appendChild(chip(c.label, c.key, ui.cat, kiesCat));
-    }
-  });
+  // altijd alle categorieën tonen, ook de lege — zo weet je meteen
+  // waar iets onder valt als je het toevoegt
+  HOOFDCATEGORIEEN.forEach(c => el.appendChild(chip(c.label, c.key, ui.cat, kiesCat)));
 
   // rij 2: leveranciers — enkel zinvol zodra er meer dan één is
   const lev = Store.gebruikteLeveranciers();
@@ -2672,7 +2845,10 @@ function opendProduct(pid) {
   const p = Store.viaId(pid);
   if (!p) return;
   ui.productId = pid;
-  $('#m-foto').innerHTML = p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p);
+  const mf = $('#m-foto');
+  mf.innerHTML = p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p);
+  mf.classList.toggle('foto-klikbaar', !!p.foto);
+  mf.onclick = () => toonFoto(p.foto);
   $('#m-merk').textContent = p.brand;
   $('#m-naam').textContent = p.name;
   $('#m-ref').innerHTML = `<b>${ontsnap(p.ref)}</b>${p.leverancier ? ' · ' + ontsnap(p.leverancier) : ''}`
@@ -2731,6 +2907,17 @@ function bindBewerkModal() {
     if (!bewerkId) $('#b-hoofdcat').value = Store.catVanLeverancier(e.target.value);
   });
 
+  $('#b-naam').addEventListener('input', () => {
+    tekenLijktOp();
+    // het afgesproken minimum meteen invullen, zolang je er zelf nog niets zette
+    const veld = $('#b-min');
+    if (!bewerkId && (!veld.value || veld.value === '0' || veld.dataset.auto === '1')) {
+      const regel = regelVoor($('#b-merk').value, $('#b-naam').value);
+      veld.value = regel ? regel.min : 0;
+      veld.dataset.auto = '1';
+    }
+  });
+  $('#b-min').addEventListener('input', e => { e.target.dataset.auto = ''; });
   $('#b-annuleer').addEventListener('click', () => { $('#modal-bewerk').hidden = true; });
   $('#b-bewaar').addEventListener('click', bewaarBewerk);
   $('#b-verwijder').addEventListener('click', async () => {
@@ -2749,6 +2936,33 @@ function bindBewerkModal() {
   });
 }
 
+/** Toont bestaande producten met een gelijkaardige naam. */
+function tekenLijktOp() {
+  const el = $('#b-lijkt-op');
+  const naam = $('#b-naam').value.trim();
+  const lijst = naam.length >= 4 ? Store.gelijkaardig(naam, bewerkId || '') : [];
+  el.hidden = !lijst.length;
+  if (!lijst.length) return;
+
+  el.innerHTML = `<div class="lijkt-op__kop">Lijkt op ${lijst.length === 1 ? 'een product' : lijst.length + ' producten'} die je al hebt:</div>` +
+    lijst.map(p => `
+      <button type="button" data-id="${p.id}">
+        <span class="lijkt-op__foto">${p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p)}</span>
+        <span class="lijkt-op__tekst">
+          <span class="lijkt-op__naam">${ontsnap([p.brand, p.name].filter(Boolean).join(' '))}</span>
+          <span class="lijkt-op__meta">${p.qty} in voorraad · ${ontsnap(p.ref)}${p.leverancier ? ' · ' + ontsnap(p.leverancier) : ''}</span>
+        </span>
+      </button>`).join('');
+
+  el.onclick = e => {
+    const knop = e.target.closest('button[data-id]');
+    if (!knop) return;
+    if (!confirm('Dit product bestaat al. Wil je het bestaande openen om bij te tellen?')) return;
+    $('#modal-bewerk').hidden = true;
+    opendProduct(knop.dataset.id);
+  };
+}
+
 function tekenFotoVoorbeeld() {
   const el = $('#b-voorbeeld');
   el.innerHTML = bewerkFoto
@@ -2756,6 +2970,8 @@ function tekenFotoVoorbeeld() {
     : svg('<path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/>');
   $('#b-foto-weg').hidden = !bewerkFoto;
   $('#b-foto-knop').textContent = bewerkFoto ? 'Andere foto' : 'Foto nemen';
+  el.classList.toggle('foto-klikbaar', !!bewerkFoto);
+  el.onclick = () => toonFoto(bewerkFoto);
 }
 
 function openBewerk(pid, metCamera = false) {
@@ -2802,6 +3018,8 @@ async function bewaarBewerk() {
   if (bewerkId) {
     if (!velden.ref) delete velden.ref;                 // bestaande referentie behouden
     await Store.bewerkProduct(bewerkId, velden);
+  } else if (!await geenDubbel(velden.name)) {
+    return;
   } else {
     const dubbel = velden.ref && Store.viaRef(velden.ref);
     if (dubbel) return melding('Deze Ref Cebeo bestaat al: ' + dubbel.name.slice(0, 30));
@@ -2809,6 +3027,29 @@ async function bewaarBewerk() {
   }
   $('#modal-bewerk').hidden = true;
   melding('Bewaard.');
+}
+
+/**
+ * Bestaat er al iets met (bijna) dezelfde naam? Dan eerst vragen wat de
+ * bedoeling is: bijtellen bij het bestaande product, of toch een nieuw
+ * product aanmaken.
+ * @returns {Promise<boolean>} true = doorgaan met een nieuw product
+ */
+async function geenDubbel(naam) {
+  const lijst = Store.gelijkaardig(naam);
+  if (!lijst.length) return true;
+  const p = lijst[0];
+  const bijtellen = confirm(
+    `"${[p.brand, p.name].filter(Boolean).join(' ')}" staat al in je voorraad (${p.qty} stuks).\n\n` +
+    'OK = dat product openen om bij te tellen\n' +
+    'Annuleren = toch een nieuw product aanmaken'
+  );
+  if (bijtellen) {
+    $('#modal-bewerk').hidden = true;
+    opendProduct(p.id);
+    return false;
+  }
+  return true;
 }
 
 /** Verkleint naar max 320px en slaat op als JPEG — anders loopt localStorage vol. */
@@ -3181,6 +3422,16 @@ function bindInstellingen() {
     melding('Leverancier toegevoegd.');
   });
 
+  $('#btn-regels-toepassen').addEventListener('click', async () => {
+    const ookHandmatig = confirm(
+      'Regels opnieuw toepassen.\n\n' +
+      'OK = ook de minimums die je zelf hebt ingesteld overschrijven\n' +
+      'Annuleren = enkel de automatische minimums bijwerken'
+    );
+    const n = await Store.pasRegelsToe({ ookHandmatig });
+    melding(n ? `${n} product${n === 1 ? '' : 'en'} bijgewerkt.` : 'Alles stond al goed.');
+  });
+
   $('#btn-backup').addEventListener('click', () => {
     download('levaux-voorraad-backup-' + datumStempel() + '.json', Store.exportJson(), 'application/json');
     melding('Back-up gedownload.');
@@ -3212,6 +3463,13 @@ function bindInstellingen() {
     melding('Alles gewist.');
     toon('voorraad');
   });
+}
+
+function tekenRegels() {
+  const el = $('#regel-lijst');
+  if (!el) return;
+  el.innerHTML = MINIMUMREGELS.map(r =>
+    `<div class="regelrij"><span>${ontsnap(r.label)}</span><b>${r.min}</b></div>`).join('');
 }
 
 function tekenOpslag() {

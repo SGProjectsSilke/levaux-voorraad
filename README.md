@@ -6,7 +6,10 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Categorieën** — Elektra · Sanitair & chauffage · Ruwbouw · Materialen, als filter bovenaan; per product aanpasbaar
 - **Leveranciers** — filter per leverancier; elke leverancier heeft een standaardcategorie (Cebeo → Elektra)
 - **Afboeken** — één tik op de min-knop, of een aantal ingeven in het productscherm
-- **Bijbestellen vanaf** — het minimum per product staat in het productscherm zelf, zodat je het instelt op het moment dat je de voorraad ziet
+- **Bijbestellen vanaf** — het minimum per product staat in het productscherm zelf. Per soort materiaal ligt een vaste regel vast (automaat 15, afdekplaat 25, kabelgoot 5 …); nieuwe producten krijgen dat minimum vanzelf, en een zelf ingesteld minimum blijft staan
+- **Categorieën altijd zichtbaar** — ook de lege, zodat je weet waar iets onder valt
+- **Foto vergroten** — tik op de productfoto in het productscherm
+- **Dubbels vermijden** — typ je een naam die lijkt op iets wat je al hebt, dan toont de app die producten en vraagt ze of je wil bijtellen
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
 - **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen
 - **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
@@ -144,6 +147,12 @@ Een product ziet er zo uit:
 ```
 
 Opgeslagen gegevens van een oudere versie worden automatisch bijgewerkt (`migreer()` in `store.js`). Bij een modelwijziging: `DATAVERSIE` verhogen en de migratie aanvullen.
+
+### Minimumregels
+
+`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld; "Regels opnieuw toepassen" bij Instellingen laat de zelf ingestelde met rust, tenzij je uitdrukkelijk anders kiest.
+
+Nieuwe soorten toevoegen: één regel bij in de lijst, `DATAVERSIE` verhogen en in `migreer()` de regels opnieuw laten lopen.
 
 ## Volgende stappen
 

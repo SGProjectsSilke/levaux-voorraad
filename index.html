@@ -171,6 +171,13 @@
     </div>
 
     <div class="paneel">
+      <h3>Minimumvoorraad</h3>
+      <p>Per soort materiaal ligt vast wanneer je wil bijbestellen. Nieuwe producten krijgen dat minimum automatisch. Stel je bij een product zelf een minimum in, dan blijft dat staan.</p>
+      <div id="regel-lijst"></div>
+      <button class="knop knop--leeg" id="btn-regels-toepassen" style="margin-top:12px">Regels opnieuw toepassen</button>
+    </div>
+
+    <div class="paneel">
       <h3>Back-up</h3>
       <p>De voorraad staat op dit toestel. Maak regelmatig een back-upbestand — zeker voor je de browsergegevens wist of van telefoon wisselt.</p>
       <div id="opslag" style="margin-bottom:14px"></div>
@@ -280,7 +287,10 @@
       </div>
     </div>
 
-    <div class="veld"><label for="b-naam">Omschrijving</label><input type="text" id="b-naam" placeholder="Snelbouwsteen 14 cm"></div>
+    <div class="veld"><label for="b-naam">Omschrijving</label>
+      <input type="text" id="b-naam" placeholder="Snelbouwsteen 14 cm" autocomplete="off">
+      <div class="lijkt-op" id="b-lijkt-op" hidden></div>
+    </div>
     <div class="rij">
       <div class="veld"><label for="b-hoofdcat">Categorie</label><select id="b-hoofdcat"></select></div>
       <div class="veld"><label for="b-lev">Leverancier</label><select id="b-lev"></select></div>
@@ -341,6 +351,12 @@
       <button class="knop knop--leeg" id="team-annuleer">Later</button>
     </div>
   </div>
+</div>
+
+<!-- ============ FOTO GROOT ============ -->
+<div class="fotoviewer" id="fotoviewer" hidden>
+  <img id="fotoviewer-beeld" alt="">
+  <button class="fotoviewer__sluit" id="fotoviewer-sluit" aria-label="Sluiten">&times;</button>
 </div>
 
 <div class="toast" id="toast" hidden></div>
