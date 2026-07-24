@@ -37,6 +37,155 @@ function laadTesseract() {
   return tesseractGeladen;
 }
 
+/* ===========================================================
+   PDF's
+   -----------------------------------------------------------
+   Een bestelbon uit een webshop is meestal een PDF met een
+   échte tekstlaag. Die uitlezen is niet alleen sneller dan
+   tekstherkenning, het is ook foutloos: geen O die een 0 wordt.
+   Daarom kijken we eerst of er tekst in zit. Is de PDF een
+   ingescande foto, dan renderen we de bladzijden en gaat het
+   alsnog door de gewone herkenning.
+   =========================================================== */
+
+/* pdf.js staat in de repo zelf, niet op een CDN. Zo werkt het inlezen van
+   een PDF óók zonder internet — precies wat je wil in een werkbus in een
+   kelder. (De tekstherkenning voor foto's heeft wél internet nodig; die
+   sleept een taalbestand van 2 MB mee.) */
+const PDFJS_CDN    = './vendor/pdf.min.js';
+const PDFJS_WORKER = './vendor/pdf.worker.min.js';
+
+let pdfGeladen = null;
+
+function laadPdfJs() {
+  if (pdfGeladen) return pdfGeladen;
+  pdfGeladen = new Promise((ok, nok) => {
+    if (window.pdfjsLib) return ok(window.pdfjsLib);
+    const s = document.createElement('script');
+    s.src = PDFJS_CDN;
+    s.onload = () => {
+      const lib = window.pdfjsLib;
+      if (!lib) return nok(new Error('De PDF-lezer kon niet geladen worden.'));
+      lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      ok(lib);
+    };
+    s.onerror = () => nok(new Error('De PDF-lezer kon niet geladen worden — is er internet?'));
+    document.head.appendChild(s);
+  });
+  return pdfGeladen;
+}
+
+export const isPdf = b => /pdf$/i.test(b?.type || '') || /\.pdf$/i.test(b?.name || '');
+
+/**
+ * Zet de tekstfragmenten van één PDF-bladzijde terug in regels.
+ * pdf.js geeft losse stukjes tekst met hun positie; wat op dezelfde hoogte
+ * staat hoort bij elkaar. Zonder die stap staan de kolommen van een tabel
+ * door elkaar, net zoals bij tekstherkenning.
+ */
+function pdfRegels(items) {
+  const stukken = items
+    .filter(i => (i.str || '').trim() !== '')
+    .map(i => ({ t: i.str, x: i.transform[4], y: Math.round(i.transform[5]), h: Math.abs(i.transform[3]) || 10 }));
+  if (!stukken.length) return '';
+
+  // op hoogte groeperen, met een marge van een halve regelhoogte
+  const marge = Math.max(2, (stukken.reduce((s, x) => s + x.h, 0) / stukken.length) * 0.4);
+  const rijen = [];
+  stukken.sort((a, b) => b.y - a.y || a.x - b.x);
+  for (const s of stukken) {
+    const rij = rijen.find(r => Math.abs(r.y - s.y) <= marge);
+    if (rij) { rij.items.push(s); rij.y = (rij.y + s.y) / 2; }
+    else rijen.push({ y: s.y, items: [s] });
+  }
+
+  return rijen.map(r => {
+    r.items.sort((a, b) => a.x - b.x);
+    let uit = '';
+    let vorigeX = null;
+    for (const s of r.items) {
+      // een echt gat tussen twee kolommen wordt een spatie, geen aaneenplakking
+      if (vorigeX !== null && s.x - vorigeX > 1) uit += ' ';
+      uit += s.t;
+      vorigeX = s.x + (s.t.length * s.h * 0.5);
+    }
+    return uit.replace(/\s{2,}/g, ' ').trim();
+  }).filter(Boolean).join('\n');
+}
+
+/**
+ * Leest PDF-bestanden. Zit er een tekstlaag in, dan gebruiken we die.
+ * Zo niet, dan renderen we de bladzijden als afbeelding zodat de gewone
+ * tekstherkenning het kan overnemen.
+ * @returns {Promise<{tekst:string, paginas:object[], bron:'tekstlaag'|'beeld'}>}
+ */
+export async function leesPdf(bestanden, opVoortgang = () => {}) {
+  opVoortgang(3, 'PDF-lezer laden…');
+  const pdfjs = await laadPdfJs();
+
+  const stukken = [];
+  const teRenderen = [];
+
+  for (let b = 0; b < bestanden.length; b++) {
+    const buffer = await bestanden[b].arrayBuffer();
+    const doc = await pdfjs.getDocument({ data: buffer }).promise;
+    for (let n = 1; n <= doc.numPages; n++) {
+      opVoortgang(6 + (n / doc.numPages) * 30, `Bladzijde ${n} van ${doc.numPages} lezen…`);
+      const page = await doc.getPage(n);
+      const inhoud = await page.getTextContent();
+      const tekst = pdfRegels(inhoud.items);
+      if (tekst.replace(/\s/g, '').length >= 40) stukken.push(tekst);
+      else teRenderen.push(page);          // bladzijde zonder tekstlaag: ingescand
+    }
+  }
+
+  // Genoeg echte tekst gevonden? Dan zijn we klaar — geen herkenning nodig.
+  if (stukken.length) {
+    opVoortgang(100, 'Klaar');
+    return { tekst: stukken.join('\n'), paginas: [], bron: 'tekstlaag' };
+  }
+
+  if (!teRenderen.length) throw new Error('Deze PDF bevat geen leesbare tekst.');
+
+  // Ingescande PDF: bladzijden renderen en door de gewone herkenning halen.
+  opVoortgang(38, 'Ingescande PDF — bladzijden klaarzetten…');
+  const canvassen = [];
+  for (let i = 0; i < teRenderen.length; i++) {
+    const page = teRenderen[i];
+    const basis = page.getViewport({ scale: 1 });
+    const schaal = Math.min(3, Math.max(1.5, 1900 / basis.width));
+    const viewport = page.getViewport({ scale: schaal });
+    const c = document.createElement('canvas');
+    c.width = Math.round(viewport.width);
+    c.height = Math.round(viewport.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+    canvassen.push(c);
+  }
+  return await leesCanvassen(canvassen, opVoortgang, 40);
+}
+
+/** Haalt tekst uit canvassen die al klaarstaan (bv. gerenderde PDF-pagina's). */
+async function leesCanvassen(canvassen, opVoortgang, vanaf = 10) {
+  const T = await laadTesseract();
+  const ruimte = 98 - vanaf;
+  const worker = await T.createWorker('nld', 1, {
+    logger: m => { if (m.status === 'recognizing text') opVoortgang(vanaf + m.progress * ruimte, 'Tekst lezen…'); }
+  });
+  await worker.setParameters({ tessedit_pageseg_mode: '6' });   // bonnen zijn tabellen
+  const paginas = [];
+  try {
+    for (let i = 0; i < canvassen.length; i++) {
+      opVoortgang(vanaf + (i / canvassen.length) * ruimte, `Bladzijde ${i + 1} van ${canvassen.length}…`);
+      const { data } = await worker.recognize(canvassen[i], {}, { text: true, blocks: true });
+      paginas.push({ tekst: data.text || '', woorden: haalWoorden(data), canvas: canvassen[i] });
+    }
+  } finally {
+    await worker.terminate();
+  }
+  opVoortgang(100, 'Klaar');
+  return { tekst: paginas.map(p => p.tekst).join('\n'), paginas, bron: 'beeld' };
+}
+
 /** Schaalt een screenshot op: kleine cijfers worden anders overgeslagen. */
 async function voorbewerk(bestand) {
   const bitmap = await createImageBitmap(bestand);
@@ -270,7 +419,111 @@ const TABELRIJ = new RegExp(
   'i'
 );
 
-const OVERSLAAN = /totaal\s*artikelen|extra\s*opties|ordernummer|^\s*algemeen|btw|subtotaal|verzend|levering/i;
+const OVERSLAAN = new RegExp([
+  'totaal\\s*artikelen', 'extra\\s*opties', 'ordernummer', '^\\s*algemeen',
+  'btw', 'subtotaal', 'verzend', 'levering', 'transport', 'korting',
+  'te\\s*betalen', 'eindtotaal', 'algemene\\s*voorwaarden', 'bladzijde',
+  'pagina\\s*\\d', 'iban', '\\bbe\\s?\\d{2}\\b', 'rekeningnummer',
+  'klantnummer', 'btw-?nummer', 'ondernemingsnummer',
+  'adres', 'postcode', 'tel(efoon)?\\s*[:.]', 'e-?mail', 'www\\.', '@',
+  'datum', 'vervaldag', 'referte', 'uw\\s*ref', 'onze\\s*ref',
+  'omschrijving\\s+aantal', 'artikel\\s*(nr|nummer)', 'eenheidsprijs',
+  'bedrag', 'handtekening', 'bedankt', 'levertermijn'
+].join('|'), 'i');
+
+/* --- De vrije tabellezer -----------------------------------
+   Elke leverancier maakt zijn bestelbon anders op. In plaats
+   van per leverancier een patroon te schrijven, ontleden we
+   een regel zoals een mens dat doet: achteraan staan de
+   bedragen, daarvoor het aantal, en wat overblijft is het
+   artikelnummer met de omschrijving.
+
+   Dat levert soms een regel te veel op. Die markeren we als
+   onzeker (rood op het controlescherm) in plaats van hem stil
+   te laten passeren met een verzonnen aantal.
+------------------------------------------------------------ */
+
+// 1.234,56 · 1234,56 · 12.50 · 0,07 — met of zonder euroteken
+const BEDRAG = /(?:€\s*)?\d{1,3}(?:[. ]\d{3})*,\d{2}|(?:€\s*)?\d+\.\d{2}(?![\d])|€\s*\d+(?![\d.,])/g;
+const EENHEID = /^(st|stk|stuk|stuks|pc|pce|pcs|m|m1|m2|m²|lm|kg|l|ltr|doos|dozen|rol|zak|pak|set|paar|bus|blik)$/i;
+
+/** Ziet dit eruit als een artikelnummer? Cijfers erin, niet té lang. */
+function isArtikelnummer(token) {
+  if (!token || token.length < 3 || token.length > 22) return false;
+  if (!/\d/.test(token)) return false;
+  if (!/^[A-Z0-9][A-Z0-9._/\-]*$/i.test(token)) return false;
+  return !/^\d{1,3}$/.test(token);            // een los klein getal is een aantal
+}
+
+function ontleedRegel(lijn) {
+  // bedragen achteraan wegnemen en onthouden
+  const bedragen = [];
+  let rest = lijn.replace(BEDRAG, m => {
+    bedragen.push(naarGetal(m.replace(/[€\s]/g, '')));
+    return '   ';
+  });
+  // enkel bedragen die écht achteraan stonden tellen mee als prijs
+  const staartOnly = /^[^ ]*(?: [^A-Za-zÀ-ÿ]*)+$/.test(rest.replace(/\s+/g, ' '));
+  rest = rest.replace(/ /g, ' ').replace(/\s{2,}/g, ' ').trim();
+
+  const tokens = rest.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return null;
+
+  // aantal: het laatste losse gehele getal, eventueel gevolgd door een eenheid
+  let qty = null, qtyIndex = -1;
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const t = tokens[i].replace(/^x$/i, '');
+    if (EENHEID.test(tokens[i])) continue;
+    if (/^\d{1,4}$/.test(t)) {
+      const n = parseInt(t, 10);
+      // een jaartal of een maat middenin de naam is geen aantal
+      if (n >= 1 && n <= 9999) { qty = n; qtyIndex = i; }
+      break;
+    }
+    if (/^[a-zà-ÿ]/i.test(tokens[i])) break;      // woord → geen aantal meer verderop
+  }
+
+  // artikelnummer vooraan?
+  let ref = '';
+  let start = 0;
+  if (isArtikelnummer(tokens[0])) { ref = tokens[0].toUpperCase(); start = 1; }
+
+  const eind = qtyIndex >= 0 ? qtyIndex : tokens.length;
+  const deel = tokens.slice(start, eind);
+  // "x 70" en "480 st": het maatwoord hoort niet in de omschrijving. Enkel
+  // achteraan wegnemen — "Alupex buis 16x2 rol 50m" moet die rol behouden.
+  while (deel.length && (/^x$/i.test(deel[deel.length - 1]) || EENHEID.test(deel[deel.length - 1]))) deel.pop();
+  const naam = deel.join(' ').replace(/[\s,;:\-]+$/, '').trim();
+
+  if (naam.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 3) return null;   // geen echte omschrijving
+  if (qty === null && !bedragen.length) return null;               // niets bruikbaars
+
+  const prijs = staartOnly && bedragen.length ? bedragen[0] : 0;
+  const totaal = staartOnly && bedragen.length > 1 ? bedragen[bedragen.length - 1] : 0;
+
+  // klopt aantal × prijs met het totaal? dan is de regel zeker goed gelezen
+  let zeker = qty !== null;
+  if (zeker && totaal && prijs) {
+    const verwacht = qty * prijs;
+    zeker = Math.abs(verwacht - totaal) < Math.max(0.02, verwacht * 0.02);
+  }
+  if (qty === null) qty = 0;
+
+  return { ref, brand: '', name: naam.replace(/\s{2,}/g, ' '), qty, price: prijs, zeker };
+}
+
+/** Vrije lezer over alle regels. */
+function parseerVrij(tekst) {
+  const lijnen = String(tekst || '').replace(/\r/g, '').split('\n');
+  const regels = [];
+  for (const ruw of lijnen) {
+    const lijn = ruw.replace(/\s{2,}/g, ' ').trim();
+    if (!lijn || lijn.length < 6 || OVERSLAAN.test(lijn)) continue;
+    const r = ontleedRegel(lijn);
+    if (r) regels.push(r);
+  }
+  return regels;
+}
 
 export function parseerTabel(tekst) {
   const lijnen = String(tekst || '').replace(/\r/g, '').split('\n');
@@ -296,7 +549,8 @@ export function parseerTabel(tekst) {
       regels.push({
         ref: m[1].toUpperCase(),
         brand: '',
-        name: m[2].trim().replace(/\s{2,}/g, ' '),
+        // "… wit x 70" — dat maalteken hoort niet in de naam
+        name: m[2].trim().replace(/\s{2,}/g, ' ').replace(/\s+x$/i, ''),
         qty,
         price: prijs,
         zeker
@@ -313,7 +567,15 @@ export function parseerTabel(tekst) {
       vorige.name = (vorige.name + ' ' + lijn).replace(/\s{2,}/g, ' ').trim();
     }
   }
-  return voegSamen(regels);
+
+  const streng = voegSamen(regels);
+
+  /* De strenge lezer hierboven kent de opmaak van EMZ en werkt daar
+     perfect. Vindt ze niets of bijna niets, dan is het een bon van een
+     leverancier die we nog niet kennen — dan neemt de vrije lezer over. */
+  const vrij = voegSamen(parseerVrij(tekst));
+  if (vrij.length > streng.length * 1.3 || (!streng.length && vrij.length)) return vrij;
+  return streng;
 }
 
 /**

@@ -3,7 +3,7 @@
    =========================================================== */
 
 import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat, MINIMUMREGELS } from './store.js';
-import { leesAfbeeldingen, herlees, parseer, parseerKaarten, parseerTabel, haalFotos, haalOrdernummer, raadLeverancier } from './ocr.js';
+import { leesAfbeeldingen, leesPdf, isPdf, herlees, parseer, parseerKaarten, parseerTabel, haalFotos, haalOrdernummer, raadLeverancier } from './ocr.js';
 import { Cloud } from './cloud.js';
 
 const $ = s => document.querySelector(s);
@@ -705,6 +705,22 @@ function verkleinFoto(bestand) {
    Inboeken (OCR / plakken / handmatig)
    =========================================================== */
 
+/**
+ * Niets herkend? Doodlopen is dan het slechtste antwoord. We zetten de tekst
+ * die de app wél gelezen heeft in het plakveld: dan zie je meteen of het aan
+ * het lezen ligt of aan de opmaak, en je kan er handmatig mee verder.
+ */
+let laatsteTekst = '';
+
+function toonNietGelukt(tekst) {
+  const schoon = String(tekst || '').trim();
+  if (!schoon) return melding('Er kwam geen leesbare tekst uit dit bestand. Probeer een scherpere afbeelding.');
+  const veld = $('#plak-tekst');
+  veld.value = schoon;
+  veld.closest('.paneel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  melding('Deze opmaak ken ik nog niet. De gelezen tekst staat hieronder — kijk ze na en klik “Tekst uitlezen”.');
+}
+
 function bindInboeken() {
   $('#ocr-bestanden').addEventListener('change', async e => {
     const bestanden = [...e.target.files];
@@ -718,24 +734,45 @@ function bindInboeken() {
     };
 
     try {
-      // Eerste poging: gewone leesmodus. Die is het beste voor de
-      // kaartjeslijst van Cebeo.
-      let { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang);
-      let formaat = 'cebeo';
-      let regels = parseerKaarten(tekst);
+      const pdfs = bestanden.filter(isPdf);
+      const beelden = bestanden.filter(b => !isPdf(b));
+      if (pdfs.length && beelden.length) {
+        $('#ocr-voortgang').hidden = true;
+        return melding('Kies PDF’s en schermafbeeldingen apart — dan gaat het inlezen een stuk beter.');
+      }
 
-      if (!regels.length) {
-        // Geen kaartjes gevonden → het is een tabel, en die moet in
-        // "één blok"-modus gelezen worden.
-        zetVoortgang(8, 'Andere opmaak — even opnieuw lezen…');
-        ({ tekst, paginas } = await herlees(paginas, 'tabel', zetVoortgang));
-        formaat = 'tabel';
-        regels = parseerTabel(tekst);
+      let tekst, paginas = [], formaat, regels;
+
+      if (pdfs.length) {
+        // Een PDF met een echte tekstlaag hoeft niet door de herkenning:
+        // die tekst is al perfect. Alleen ingescande PDF's gaan die weg op.
+        const uit = await leesPdf(pdfs, zetVoortgang);
+        tekst = uit.tekst;
+        paginas = uit.paginas;
+        const kaarten = parseerKaarten(tekst);
+        formaat = kaarten.length ? 'cebeo' : 'tabel';
+        regels = kaarten.length ? kaarten : parseerTabel(tekst);
+      } else {
+        // Eerste poging: gewone leesmodus. Die is het beste voor de
+        // kaartjeslijst van Cebeo.
+        ({ tekst, paginas } = await leesAfbeeldingen(beelden, zetVoortgang));
+        formaat = 'cebeo';
+        regels = parseerKaarten(tekst);
+
+        if (!regels.length) {
+          // Geen kaartjes gevonden → het is een tabel, en die moet in
+          // "één blok"-modus gelezen worden.
+          zetVoortgang(8, 'Andere opmaak — even opnieuw lezen…');
+          ({ tekst, paginas } = await herlees(paginas, 'tabel', zetVoortgang));
+          formaat = 'tabel';
+          regels = parseerTabel(tekst);
+        }
       }
 
       $('#ocr-voortgang').hidden = true;
       if (!regels.length) {
-        return melding('Geen productregels herkend. Probeer scherpere afbeeldingen, of plak de tekst.');
+        laatsteTekst = tekst;
+        return toonNietGelukt(tekst);
       }
 
       const geraden = raadLeverancier(tekst, Store.leveranciers());

@@ -1,7 +1,7 @@
 /* Service worker — zorgt dat de app ook zonder internet opent.
    Verhoog CACHE bij elke nieuwe versie, anders blijft de oude app hangen. */
 
-const CACHE = 'levaux-voorraad-v16';
+const CACHE = 'levaux-voorraad-v17';
 const BESTANDEN = [
   './',
   './index.html',
@@ -13,7 +13,11 @@ const BESTANDEN = [
   './config.js',
   './data/seed.json',
   './assets/logo-mark.png',
-  './manifest.webmanifest'
+  './manifest.webmanifest',
+  // pdf.js staat lokaal in de repo, zodat een bestelbon-PDF ook zonder
+  // internet ingelezen kan worden
+  './vendor/pdf.min.js',
+  './vendor/pdf.worker.min.js'
 ];
 
 self.addEventListener('install', e => {

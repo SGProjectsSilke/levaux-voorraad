@@ -10,7 +10,7 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.9.0';
+export const VERSIE = '2.0.0';
 const DATAVERSIE = 7;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */

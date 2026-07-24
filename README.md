@@ -10,8 +10,9 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Categorieën altijd zichtbaar** — ook de lege, zodat je weet waar iets onder valt
 - **Foto vergroten** — tik op de productfoto in het productscherm
 - **Handmatig toevoegen met typeahead** — vanaf twee letters toont de app onder het invulveld de producten die je al hebt staan, met foto, aantal en referentie. Eén tik erop brengt je naar dat product om bij te tellen; typ je verder, dan maak je gewoon iets nieuws. Het minimum wordt ondertussen al ingevuld volgens de vaste regels, met een regeltje eronder dat zegt waar dat getal vandaan komt
-- **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
-- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen. Je hoeft niets in te stellen
+- **Inboeken** — bestelbonnen inlezen als **PDF** of als schermafbeelding, of tekst plakken, of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
+- **PDF's** — heeft de PDF een echte tekstlaag (zo goed als alle webshops en boekhoudpakketten), dan wordt die rechtstreeks gelezen: sneller én foutloos, geen O die een 0 wordt. Een ingescande PDF gaat alsnog door de tekstherkenning. `pdf.js` staat in de repo zelf, dus dit werkt ook zonder internet
+- **Onbekende opmaak** — naast de kaartjes van Cebeo en de tabel van EMZ is er een vrije lezer die elke bon aankan: bedragen staan achteraan, daarvoor het aantal, de rest is artikelnummer en omschrijving. Werkt ook op leveringsbonnen zónder prijzen. Lukt het toch niet, dan komt de gelezen tekst in het plakveld te staan in plaats van een doodlopende foutmelding
 - **Bulk verwijderen** — selectiestand in de voorraadlijst; "Alles" werkt op wat er na je filters overblijft
 - **Minimums volledig automatisch** — elk nieuw product krijgt zijn minimum uit de regels, ook bij een bestelbon of na het hernoemen van een product. Past er geen regel, dan kijkt de app naar gelijkaardige producten die je al hebt staan en neemt die hun minimum over. De aantallen per soort pas je aan bij Instellingen; alle producten van dat soort volgen meteen mee, ook na een synchronisatie. Alleen een minimum dat je bij één product zelf instelt blijft met rust
 - **Eigen regels** — bij Instellingen zet je zelf een woord en een aantal ("schakelaar → 18"). Eigen regels komen ná de vaste, zodat ze de gaten vullen zonder iets weg te kapen. Eronder staat welke producten nog op geen enkele regel passen — precies de lijst die je nodig hebt om te zien welk woord ontbreekt
@@ -32,7 +33,8 @@ css/styles.css           huisstijl (logorood #be1717 / zwart / wit)
 assets/logo-mark.png     het beeldmerk uit het logo van Cédric, tekst verwijderd
 js/app.js                schermen en interactie
 js/store.js              datalaag — hier zit de opslag achter een adapter
-js/ocr.js                tekstherkenning + parser voor Cebeo-regels
+js/ocr.js                PDF's lezen + tekstherkenning + de parsers
+vendor/pdf.min.js        pdf.js, lokaal zodat PDF's ook offline werken
 data/seed.json           startvoorraad: de 27 producten van de Cebeo-order
 tools/bouw-demo.mjs      maakt van de app één los demo-bestand
 sw.js                    service worker, zodat de app offline opent
@@ -60,7 +62,7 @@ Om iemand snel te laten klikken zonder server of hosting:
 node tools/bouw-demo.mjs
 ```
 
-Dat schrijft `demo/levaux-voorraad-demo.html`: de volledige app met CSS, JavaScript, logo en startvoorraad ingebakken. Dubbelklikken volstaat. Alles werkt, behalve de tekstherkenning — die haalt Tesseract van het internet.
+Dat schrijft `demo/levaux-voorraad-demo.html`: de volledige app met CSS, JavaScript, logo en startvoorraad ingebakken. Dubbelklikken volstaat. Alles werkt, behalve het inlezen van bonnen — de tekstherkenning haalt Tesseract van het internet en `pdf.js` zit niet in het losse bestand.
 
 ## Naar GitHub
 
