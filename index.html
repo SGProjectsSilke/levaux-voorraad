@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="nl-BE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Levaux Bouw · Voorraad</title>
+<meta name="description" content="Voorraadbeheer van Cebeo-materiaal voor Levaux Bouw.">
+<meta name="theme-color" content="#1c1c1c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Voorraad">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/logo-mark.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header__bar"></div>
+  <div class="app-header__top">
+    <img src="assets/logo-mark.png" alt="" class="logo">
+    <div class="app-header__titel">
+      <strong>Levaux Bouw</strong>
+      <span id="header-sub">Voorraad werkbus</span>
+    </div>
+    <div class="app-header__acties">
+      <button class="icoonknop" id="btn-snel-zoek" title="Zoeken" aria-label="Zoeken">&#128269;</button>
+    </div>
+  </div>
+
+  <div class="zoekbalk" id="zoekbalk">
+    <input type="search" id="zoek" placeholder="Zoek op naam, merk, referentie of leverancier…" autocomplete="off" enterkeyhint="search">
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="chips chips--tweede" id="chips-lev"></div>
+</header>
+
+<main>
+
+  <!-- ============ VOORRAAD ============ -->
+  <section class="scherm" id="scherm-voorraad">
+    <div class="stats">
+      <div class="stat"><b id="st-soorten">0</b><span>producten</span></div>
+      <div class="stat"><b id="st-stuks">0</b><span>stuks</span></div>
+      <div class="stat stat--waarschuwing"><b id="st-laag">0</b><span>bijbestellen</span></div>
+    </div>
+    <div class="lijst" id="lijst"></div>
+    <p class="voet">Tik een product aan om af te boeken of bij te tellen.</p>
+  </section>
+
+  <!-- ============ INBOEKEN ============ -->
+  <section class="scherm" id="scherm-inboeken" hidden>
+    <div class="paneel">
+      <h3>Cebeo-order inlezen</h3>
+      <p>Maak schermafbeeldingen van je order in de Cebeo-app en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe worden toegevoegd.</p>
+      <label class="dropzone" for="ocr-bestanden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <strong>Schermafbeeldingen kiezen</strong>
+        Meerdere tegelijk mag · JPG of PNG
+        <input type="file" id="ocr-bestanden" accept="image/*" multiple hidden>
+      </label>
+      <div class="voortgang" id="ocr-voortgang" hidden>
+        <span id="ocr-status">Bezig…</span>
+        <div class="balk"><i id="ocr-balk"></i></div>
+      </div>
+    </div>
+
+    <div class="paneel">
+      <h3>Tekst plakken</h3>
+      <p>Werkt de foto niet goed? Plak de orderlijst als tekst — de app haalt er de referenties, aantallen en prijzen uit.</p>
+      <div class="veld">
+        <textarea id="plak-tekst" placeholder="NIKO - Enkelvoudige afdekplaat, wit  x 70  € 1,31&#10;Ref Cebeo 101-76100&#10;…"></textarea>
+      </div>
+      <button class="knop knop--zwart" id="btn-plak">Tekst uitlezen</button>
+    </div>
+
+    <div class="paneel">
+      <h3>Eigen materiaal toevoegen</h3>
+      <p>Blokken, isolatie, buizen, een sanitairstuk — alles wat niet van Cebeo komt. Foto trekken, naam invullen, klaar. De rest mag je leeg laten.</p>
+      <button class="knop knop--zwart" id="btn-nieuw-foto">Foto nemen en toevoegen</button>
+      <button class="knop knop--leeg" id="btn-nieuw-product" style="margin-top:9px">Zonder foto toevoegen</button>
+    </div>
+  </section>
+
+  <!-- ============ CONTROLESCHERM na import ============ -->
+  <section class="scherm" id="scherm-controle" hidden>
+    <div class="waarschuwing" id="controle-waarschuwing">
+      Kijk de regels na voor je ze bevestigt. Ingelezen tekst is niet altijd perfect.
+    </div>
+    <div id="controle-regels"></div>
+    <div class="knoppen" style="margin-top:14px">
+      <button class="knop" id="btn-bevestig-import">Toevoegen aan voorraad</button>
+      <button class="knop knop--leeg" id="btn-annuleer-import">Annuleren</button>
+    </div>
+  </section>
+
+  <!-- ============ BESTELLEN ============ -->
+  <section class="scherm" id="scherm-bestellen" hidden>
+    <div class="paneel">
+      <h3>Bij te bestellen</h3>
+      <p>Alles wat onder je ingestelde minimum zit, gegroepeerd per leverancier. Het minimum stel je per product in.</p>
+      <div class="knoppen">
+        <button class="knop knop--zwart" id="btn-kopieer-bestel">Lijst kopiëren</button>
+        <button class="knop knop--leeg" id="btn-mail-bestel">Doorsturen via mail</button>
+      </div>
+    </div>
+    <div class="lijst" id="bestellijst"></div>
+  </section>
+
+  <!-- ============ HISTORIEK ============ -->
+  <section class="scherm" id="scherm-historiek" hidden>
+    <div class="rij" style="margin-bottom:12px">
+      <button class="knop knop--leeg" id="btn-export-csv">Historiek exporteren naar CSV</button>
+    </div>
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- ============ INSTELLINGEN ============ -->
+  <section class="scherm" id="scherm-instellingen" hidden>
+    <div class="paneel">
+      <h3>Leveranciers</h3>
+      <p>Bij elke leverancier hoort een standaardcategorie. Voeg je een product van Cebeo toe, dan staat Elektra dus al goed.</p>
+      <div id="lev-lijst"></div>
+      <div class="veld" style="margin:12px 0 8px">
+        <input type="text" id="nieuwe-lev" placeholder="Naam nieuwe leverancier">
+      </div>
+      <div class="rij">
+        <div class="veld" style="margin:0"><select id="nieuwe-lev-cat"></select></div>
+        <button class="knop knop--zwart knop--kort" id="btn-lev-toevoegen">Toevoegen</button>
+      </div>
+    </div>
+
+    <div class="paneel">
+      <h3>Back-up</h3>
+      <p>De voorraad staat op dit toestel. Maak regelmatig een back-upbestand — zeker voor je de browsergegevens wist of van telefoon wisselt.</p>
+      <div id="opslag" style="margin-bottom:14px"></div>
+      <div class="knoppen">
+        <button class="knop knop--zwart" id="btn-backup">Back-up downloaden</button>
+        <button class="knop knop--leeg" id="btn-herstel">Back-up terugzetten</button>
+        <input type="file" id="herstel-bestand" accept="application/json" hidden>
+      </div>
+    </div>
+
+    <div class="paneel">
+      <h3>Voorraad opnieuw beginnen</h3>
+      <p>Zet alles terug naar de startlijst van de Cebeo-order, of wis alles.</p>
+      <div class="knoppen">
+        <button class="knop knop--leeg" id="btn-reset-seed">Terug naar startlijst</button>
+        <button class="knop knop--leeg" id="btn-wis-alles" style="color:var(--rood)">Alles wissen</button>
+      </div>
+    </div>
+
+    <p class="voet">
+      Levaux Bouw · Voorraad<br>
+      Gemaakt door SG Projects · <span id="versie"></span>
+    </p>
+  </section>
+
+</main>
+
+<!-- ============ ONDERBALK ============ -->
+<nav class="nav" id="nav">
+  <button data-scherm="voorraad" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13H3z"/><path d="M3 7l2-3h14l2 3M9 12h6"/></svg>
+    Voorraad
+  </button>
+  <button data-scherm="inboeken">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    Inboeken
+  </button>
+  <button data-scherm="bestellen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.55L21 8H6"/><circle cx="10" cy="20.5" r="1"/><circle cx="17" cy="20.5" r="1"/></svg>
+    Bestellen
+    <i class="nav__badge" id="badge-bestellen" hidden>0</i>
+  </button>
+  <button data-scherm="historiek">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>
+    Historiek
+  </button>
+  <button data-scherm="instellingen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/></svg>
+    Meer
+  </button>
+</nav>
+
+<!-- ============ MODAL: product ============ -->
+<div class="modal" id="modal-product" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <div class="modal__titel">
+      <div class="kaart__foto" id="m-foto"></div>
+      <div style="min-width:0">
+        <div class="kaart__merk" id="m-merk"></div>
+        <h2 id="m-naam"></h2>
+        <div class="kaart__ref" id="m-ref"></div>
+      </div>
+    </div>
+
+    <div class="teller">
+      <button class="teller__min" id="m-min">−</button>
+      <input type="number" id="m-aantal" inputmode="numeric" min="0">
+      <button class="teller__plus" id="m-plus">+</button>
+    </div>
+    <div class="teller__resultaat" id="m-resultaat"></div>
+    <div class="snelkeuze" id="m-snelkeuze"></div>
+
+    <div class="drempel">
+      <div>
+        <strong>Bijbestellen vanaf</strong>
+        <span>Zakt de voorraad tot hier, dan komt het product in je bestellijst.</span>
+      </div>
+      <input type="number" id="m-drempel" inputmode="numeric" min="0" aria-label="Minimum voorraad">
+    </div>
+
+    <div class="knoppen">
+      <button class="knop" id="m-bevestig">Afboeken</button>
+      <button class="knop knop--zwart" id="m-bijtel">Bijtellen</button>
+      <button class="knop knop--leeg" id="m-bewerk">Product bewerken</button>
+      <button class="knop knop--leeg" id="m-sluit">Sluiten</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: bewerken ============ -->
+<div class="modal" id="modal-bewerk" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 14px;font-size:1.05rem" id="b-titel">Product bewerken</h2>
+
+    <div class="fotoveld">
+      <div class="fotoveld__voorbeeld" id="b-voorbeeld"></div>
+      <div style="flex:1">
+        <button class="knop knop--zwart" id="b-foto-knop" type="button">Foto nemen</button>
+        <button class="knop knop--leeg" id="b-foto-weg" type="button" style="margin-top:7px" hidden>Foto verwijderen</button>
+        <input type="file" id="b-foto" accept="image/*" capture="environment" hidden>
+      </div>
+    </div>
+
+    <div class="veld"><label for="b-naam">Omschrijving</label><input type="text" id="b-naam" placeholder="Snelbouwsteen 14 cm"></div>
+    <div class="rij">
+      <div class="veld"><label for="b-hoofdcat">Categorie</label><select id="b-hoofdcat"></select></div>
+      <div class="veld"><label for="b-lev">Leverancier</label><select id="b-lev"></select></div>
+    </div>
+    <div class="rij">
+      <div class="veld"><label for="b-qty">Aantal</label><input type="number" id="b-qty" inputmode="numeric" min="0"></div>
+      <div class="veld"><label for="b-eenheid">Eenheid</label><select id="b-eenheid"></select></div>
+      <div class="veld"><label for="b-min">Minimum</label><input type="number" id="b-min" inputmode="numeric" min="0"></div>
+    </div>
+
+    <details class="meer-velden">
+      <summary>Meer gegevens (merk, referentie, prijs)</summary>
+      <div class="veld"><label for="b-merk">Merk</label><input type="text" id="b-merk" placeholder="NIKO"></div>
+      <div class="rij">
+        <div class="veld"><label for="b-ref">Referentie</label><input type="text" id="b-ref" placeholder="101-76100"></div>
+        <div class="veld"><label for="b-prijs">Prijs €</label><input type="number" id="b-prijs" inputmode="decimal" step="0.01" min="0"></div>
+      </div>
+      <div class="veld__hulp">Laat je de referentie leeg, dan maakt de app er zelf één (bv. EIGEN-001).</div>
+    </details>
+
+    <div class="knoppen">
+      <button class="knop" id="b-bewaar">Bewaren</button>
+      <button class="knop knop--leeg" id="b-verwijder" style="color:var(--rood)">Product verwijderen</button>
+      <button class="knop knop--leeg" id="b-annuleer">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/app.js" type="module"></script>
+</body>
+</html>

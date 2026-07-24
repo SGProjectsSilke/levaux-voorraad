@@ -1,0 +1,39 @@
+{
+  "order": {
+    "label": "Cebeo order (startvoorraad)",
+    "source": "screenshots 24/07/2026",
+    "leverancier": "Cebeo",
+    "hoofdcat": "elektra",
+    "lines": 27,
+    "opmerking": "De regel 'DIVERS - Km heffing' uit de order is geen materiaal en staat dus niet in de voorraad."
+  },
+  "products": [
+    { "ref": "WDK40060G",      "brand": "OBO BETTERMANN", "name": "Kabelgoot met deksel WDK 40x60 grijs", "qty": 28,  "price": 6.76,    "min": 10,  "cat": "kabelgoot" },
+    { "ref": "136-76200",      "brand": "NIKO",           "name": "Afdekplaat INTENSE (60mm) 2-voudig verticaal, matt zwart", "qty": 2, "price": 8.81, "min": 2, "cat": "afdekplaat" },
+    { "ref": "403138",         "brand": "LEGRAND",        "name": "Automaat TX³ 3kA 4P C25 400V - 4 modules", "qty": 10, "price": 29.49, "min": 4, "cat": "automaat" },
+    { "ref": "467030000",      "brand": "TEC 7",          "name": "Reinigingsdoekjes POWERWIPES - dispenser 70 stuks", "qty": 5, "price": 12.40, "min": 2, "cat": "verbruik" },
+    { "ref": "101-76100",      "brand": "NIKO",           "name": "Enkelvoudige afdekplaat, wit", "qty": 70, "price": 1.31, "min": 20, "cat": "afdekplaat" },
+    { "ref": "403139",         "brand": "LEGRAND",        "name": "Automaat TX³ 3kA 4P C32 400V - 4 modules", "qty": 10, "price": 29.49, "min": 4, "cat": "automaat" },
+    { "ref": "101-76800",      "brand": "NIKO",           "name": "Tweevoudige afdekplaat met 71mm centerafstand, wit", "qty": 50, "price": 3.00, "min": 15, "cat": "afdekplaat" },
+    { "ref": "700-84202",      "brand": "NIKO",           "name": "Hydro spuitwaterdichte dubbele opbouwdoos, 2 functies, 2 m20-ingangen", "qty": 100, "price": 6.54, "min": 25, "cat": "doos" },
+    { "ref": "101-66601",      "brand": "NIKO",           "name": "Centraalplaat stopcontact met penaarde, 28,5mm, wit", "qty": 100, "price": 1.43, "min": 25, "cat": "stopcontact" },
+    { "ref": "101-76700",      "brand": "NIKO",           "name": "Drievoudige afdekplaat met 71mm centerafstand, wit", "qty": 20, "price": 4.93, "min": 6, "cat": "afdekplaat" },
+    { "ref": "FOR150T72G4",    "brand": "Vynckier (ABB)", "name": "Verdeelkast FOR150T72G4 Doorzichtige deur", "qty": 6, "price": 110.66, "min": 2, "cat": "verdeelkast" },
+    { "ref": "700-84102",      "brand": "NIKO",           "name": "Hydro spuitwaterdichte opbouwdoos voor 1 functie, met 2 m20-ingangen", "qty": 100, "price": 3.50, "min": 25, "cat": "doos" },
+    { "ref": "270042",         "brand": "Haupa",          "name": "Adereindhuls, geïsoleerd, 10mm², L 12mm, bruin Franse kleur, afm. DIN46228-4", "qty": 500, "price": 0.07, "min": 100, "cat": "verbruik" },
+    { "ref": "MTV500E",        "brand": "Yokis",          "name": "Inbouw dimmermodule 500W, 230V", "qty": 4, "price": 35.25, "min": 2, "cat": "module" },
+    { "ref": "G7260SCVICS",    "brand": "MIELE",          "name": "Vaatwasser voll.int., QuickPowerWash, 10 progr, ComfortClose, besteklade, A", "qty": 1, "price": 1085.72, "min": 0, "cat": "toestel" },
+    { "ref": "100-76700",      "brand": "NIKO",           "name": "Afdekplaat (71mm) 3-voudig horizontaal, crème", "qty": 25, "price": 5.75, "min": 8, "cat": "afdekplaat" },
+    { "ref": "PIN30827DG9G4",  "brand": "LEDVANCE",       "name": "LED PIN30 DIM 3W 827 CL G9 P", "qty": 2, "price": 9.40, "min": 2, "cat": "lamp" },
+    { "ref": "100-76800",      "brand": "NIKO",           "name": "Afdekplaat (71mm) 2-voudig horizontaal, crème", "qty": 50, "price": 3.49, "min": 15, "cat": "afdekplaat" },
+    { "ref": "101-76900",      "brand": "NIKO",           "name": "Blindplaat, sokkel en afwerkingsset, wit", "qty": 20, "price": 3.30, "min": 6, "cat": "afdekplaat" },
+    { "ref": "700-36605",      "brand": "NIKO",           "name": "Hydro spuitwaterdicht stopcontact met penaarde en insteekklemmen, grijs", "qty": 100, "price": 6.70, "min": 25, "cat": "stopcontact" },
+    { "ref": "MARX025925",     "brand": "MARXMAN",        "name": "Marxman marker diepe gaten 45 tot 90mm - zwart", "qty": 10, "price": 9.99, "min": 3, "cat": "gereedschap" },
+    { "ref": "170-01605",      "brand": "NIKO",           "name": "Sokkel wissel(trek)schakelaar 10A, insteekklemmen", "qty": 150, "price": 3.21, "min": 40, "cat": "schakelaar" },
+    { "ref": "IS2140EC0B",     "brand": "STEINEL H&B",    "name": "Steinel Infrarood-bewegingsmelder IS 2140 ECO zwart", "qty": 3, "price": 29.93, "min": 2, "cat": "sensor" },
+    { "ref": "411942",         "brand": "LEGRAND",        "name": "Differentieelschakelaar TX³ 4P 300mA 40A Type A - 4 modules", "qty": 15, "price": 40.31, "min": 5, "cat": "automaat" },
+    { "ref": "100-76200",      "brand": "NIKO",           "name": "Afdekplaat (60mm) 2-voudig verticaal, crème", "qty": 50, "price": 3.08, "min": 15, "cat": "afdekplaat" },
+    { "ref": "SELEKTA170T0P3", "brand": "THEBEN",         "name": "Digitale astronomische klok 230V 50-60Hz 1CO 125A", "qty": 1, "price": 125.76, "min": 1, "cat": "module" },
+    { "ref": "101-61105",      "brand": "NIKO",           "name": "Toets enkelvoudige schakelaar of drukknop, wit", "qty": 100, "price": 1.79, "min": 25, "cat": "schakelaar" }
+  ]
+}
