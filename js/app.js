@@ -487,17 +487,9 @@ function bindBewerkModal() {
     if (!bewerkId) $('#b-hoofdcat').value = Store.catVanLeverancier(e.target.value);
   });
 
-  $('#b-naam').addEventListener('input', () => {
-    tekenLijktOp();
-    // het afgesproken minimum meteen invullen, zolang je er zelf nog niets zette
-    const veld = $('#b-min');
-    if (!bewerkId && (!veld.value || veld.value === '0' || veld.dataset.auto === '1')) {
-      const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
-      veld.value = regel ? regel.min : 0;
-      veld.dataset.auto = '1';
-    }
-  });
-  $('#b-min').addEventListener('input', e => { e.target.dataset.auto = ''; });
+  $('#b-naam').addEventListener('input', () => { tekenLijktOp(); vulMinimumIn(); });
+  $('#b-merk').addEventListener('input', vulMinimumIn);
+  $('#b-min').addEventListener('input', e => { e.target.dataset.auto = ''; tekenMinHulp(); });
   $('#b-annuleer').addEventListener('click', () => { $('#modal-bewerk').hidden = true; });
   $('#b-bewaar').addEventListener('click', bewaarBewerk);
   $('#b-verwijder').addEventListener('click', async () => {
@@ -516,21 +508,26 @@ function bindBewerkModal() {
   });
 }
 
-/** Toont bestaande producten met een gelijkaardige naam. */
+/**
+ * Het lijstje onder "Omschrijving": bestaande producten waar staat wat je
+ * typt. Tik je er één aan, dan ga je naar dat product om bij te tellen; typ
+ * je gewoon door, dan maak je een nieuw product. Bij het bewerken van een
+ * bestaand product tonen we niets — daar heeft het geen nut.
+ */
 function tekenLijktOp() {
   const el = $('#b-lijkt-op');
   const naam = $('#b-naam').value.trim();
-  // enkel bij een nieuw product; bij bewerken heeft het geen zin
-  const lijst = (!bewerkId && naam.length >= 4) ? Store.gelijkaardig(naam) : [];
+  const lijst = bewerkId ? [] : Store.zoekNaam(naam);
   el.hidden = !lijst.length;
   if (!lijst.length) return;
 
-  el.innerHTML = `<div class="lijkt-op__kop">Lijkt op ${lijst.length === 1 ? 'een product' : lijst.length + ' producten'} die je al hebt:</div>` +
+  el.innerHTML =
+    `<div class="lijkt-op__kop">Staat al in je voorraad — tik aan om bij te tellen, of typ verder voor een nieuw product:</div>` +
     lijst.map(p => `
       <button type="button" data-id="${p.id}">
         <span class="lijkt-op__foto">${p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p)}</span>
         <span class="lijkt-op__tekst">
-          <span class="lijkt-op__naam">${ontsnap([p.brand, p.name].filter(Boolean).join(' '))}</span>
+          <span class="lijkt-op__naam">${markeer([p.brand, p.name].filter(Boolean).join(' '), naam)}</span>
           <span class="lijkt-op__meta">${p.qty} in voorraad · ${ontsnap(p.ref)}${p.leverancier ? ' · ' + ontsnap(p.leverancier) : ''}</span>
         </span>
       </button>`).join('');
@@ -538,10 +535,44 @@ function tekenLijktOp() {
   el.onclick = e => {
     const knop = e.target.closest('button[data-id]');
     if (!knop) return;
-    if (!confirm('Dit product bestaat al. Wil je het bestaande openen om bij te tellen?')) return;
     $('#modal-bewerk').hidden = true;
     opendProduct(knop.dataset.id);
   };
+}
+
+/** Zet het getypte stuk vet in de gevonden naam. */
+function markeer(tekst, stuk) {
+  const veilig = ontsnap(tekst);
+  const t = String(stuk).trim();
+  if (t.length < 2) return veilig;
+  const i = veilig.toLowerCase().indexOf(ontsnap(t).toLowerCase());
+  if (i < 0) return veilig;
+  const n = ontsnap(t).length;
+  return veilig.slice(0, i) + '<b>' + veilig.slice(i, i + n) + '</b>' + veilig.slice(i + n);
+}
+
+/**
+ * Vult het minimum in volgens de vaste regels, zolang je er zelf niets in
+ * hebt gezet. Zo hoeft niemand te onthouden dat een automaat er 15 moet zijn.
+ */
+function vulMinimumIn() {
+  const veld = $('#b-min');
+  if (veld.dataset.auto === '1') {
+    const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
+    veld.value = regel ? regel.min : 0;
+  }
+  tekenMinHulp();
+}
+
+/** Legt onder het veld uit waar dat getal vandaan komt. */
+function tekenMinHulp() {
+  const el = $('#b-min-hulp');
+  const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
+  const auto = $('#b-min').dataset.auto === '1';
+  if (regel && auto) el.innerHTML = `Vaste regel <b>${ontsnap(regel.label)}</b> → minimum ${regel.min}. Wijzig je het hier, dan geldt dat enkel voor dit product.`;
+  else if (regel) el.innerHTML = `Zelf ingesteld. De vaste regel <b>${ontsnap(regel.label)}</b> (${regel.min}) laat dit product met rust.`;
+  else el.textContent = 'Geen vaste regel voor dit soort — vul zelf in vanaf wanneer je wil bijbestellen.';
+  el.hidden = false;
 }
 
 function tekenFotoVoorbeeld() {
@@ -565,7 +596,7 @@ function openBewerk(pid, metCamera = false) {
   $('#b-lev').innerHTML = '<option value="">— geen —</option>' +
     levs.map(l => `<option${l === gekozen ? ' selected' : ''}>${ontsnap(l)}</option>`).join('');
 
-  $('#b-titel').textContent = p ? 'Product bewerken' : 'Eigen materiaal toevoegen';
+  $('#b-titel').textContent = p ? 'Product bewerken' : 'Handmatig toevoegen';
   $('#b-merk').value = p?.brand || '';
   $('#b-naam').value = p?.name || '';
   $('#b-ref').value = p?.ref || '';
@@ -576,6 +607,10 @@ function openBewerk(pid, metCamera = false) {
   $('#b-eenheid').value = p?.eenheid || 'stuk';
   $('#b-foto').value = '';
   $('#b-verwijder').style.display = p ? '' : 'none';
+  // "auto" = het minimum mag nog uit de regels komen. Bij een bestaand product
+  // enkel als de gebruiker daar zelf nooit iets heeft ingevuld.
+  $('#b-min').dataset.auto = (!p || p.minAuto !== false) ? '1' : '';
+  if (!p) vulMinimumIn(); else tekenMinHulp();
   tekenLijktOp();                      // lijst van een vorige keer opruimen
   tekenFotoVoorbeeld();
   $('#modal-bewerk').hidden = false;
@@ -583,12 +618,16 @@ function openBewerk(pid, metCamera = false) {
 }
 
 async function bewaarBewerk() {
+  // Staat het minimum nog op automatisch, dan geven we het niet mee als een
+  // eigen keuze — anders stopt het product met de regels te volgen.
+  const autoMin = $('#b-min').dataset.auto === '1';
   const velden = {
     brand: $('#b-merk').value.trim(),
     name: $('#b-naam').value.trim(),
     ref: $('#b-ref').value.trim(),
     qty: Math.max(0, parseInt($('#b-qty').value, 10) || 0),
     min: Math.max(0, parseInt($('#b-min').value, 10) || 0),
+    minAuto: autoMin,
     price: parseFloat($('#b-prijs').value) || 0,
     hoofdcat: $('#b-hoofdcat').value,
     leverancier: $('#b-lev').value,

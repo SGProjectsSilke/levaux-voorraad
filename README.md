@@ -9,7 +9,7 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Bijbestellen vanaf** — het minimum per product staat in het productscherm zelf. Per soort materiaal ligt een vaste regel vast (automaat 15, afdekplaat 25, kabelgoot 5 …); nieuwe producten krijgen dat minimum vanzelf, en een zelf ingesteld minimum blijft staan
 - **Categorieën altijd zichtbaar** — ook de lege, zodat je weet waar iets onder valt
 - **Foto vergroten** — tik op de productfoto in het productscherm
-- **Dubbels vermijden** — typ je een naam die lijkt op iets wat je al hebt, dan toont de app die producten en vraagt ze of je wil bijtellen
+- **Handmatig toevoegen met typeahead** — vanaf twee letters toont de app onder het invulveld de producten die je al hebt staan, met foto, aantal en referentie. Eén tik erop brengt je naar dat product om bij te tellen; typ je verder, dan maak je gewoon iets nieuws. Het minimum wordt ondertussen al ingevuld volgens de vaste regels, met een regeltje eronder dat zegt waar dat getal vandaan komt
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
 - **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen. Je hoeft niets in te stellen
 - **Bulk verwijderen** — selectiestand in de voorraadlijst; "Alles" werkt op wat er na je filters overblijft

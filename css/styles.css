@@ -650,13 +650,21 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   opacity: .8;
 }
 
-/* ---------- Lijkt op een bestaand product ------------------ */
+/* ---------- Staat al in je voorraad (typ-terwijl-je-zoekt) --- */
 
-.lijkt-op { margin-top: 8px; }
+/* Hoogte begrensd: bij zes treffers mag dit lijstje het formulier niet
+   wegduwen — je moet de knop Bewaren blijven zien. */
+.lijkt-op {
+  margin-top: 8px;
+  max-height: 43vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .lijkt-op__kop {
   font-size: .74rem; font-weight: 700; color: var(--oranje);
   margin-bottom: 6px;
+  position: sticky; top: 0; background: #fff; padding-bottom: 3px;
 }
+.lijkt-op__naam b { color: var(--rood); }
 .lijkt-op button {
   display: flex; align-items: center; gap: 9px;
   width: 100%; text-align: left;

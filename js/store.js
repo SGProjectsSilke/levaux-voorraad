@@ -353,7 +353,7 @@ export const Store = {
       // minAuto = "de gebruiker heeft hier zelf niets ingesteld", ook als er
       // (nog) geen regel op past. Anders volgt het product later niet mee
       // wanneer de naam verandert of er een regel bijkomt.
-      minAuto: !Number(data.min),
+      minAuto: data.minAuto !== undefined ? !!data.minAuto : !Number(data.min),
       price: Number(data.price) || 0,
       cat: data.cat || '',
       hoofdcat: data.hoofdcat || this.catVanLeverancier(leverancier),
@@ -576,6 +576,35 @@ export const Store = {
       .filter(x => x.score >= 0.5)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
+      .map(x => x.p);
+  },
+
+  /**
+   * Typ-terwijl-je-zoekt: bestaande producten waar de getypte tekst letterlijk
+   * in voorkomt. Bewust simpel — dit is het lijstje onder het invulveld, niet
+   * de dubbelcontrole. Wie "schakel" typt wil ook "Schakelaar" zien.
+   * Wat met de tekst begint komt bovenaan.
+   */
+  zoekNaam(tekst, negeerId = '', limiet = 6) {
+    const t = String(tekst).toLowerCase().trim();
+    if (t.length < 2) return [];
+    return this.staat.producten
+      .filter(p => p.id !== negeerId)
+      .map(p => {
+        // We rangschikken op de omschrijving zelf, niet op merk + omschrijving:
+        // anders staat "Schakelaar enkelpolig" achteraan omdat er "NIKO" voor
+        // staat en het woord dus niet meer vooraan lijkt te komen.
+        const naam = String(p.name || '').toLowerCase();
+        const pos = naam.indexOf(t);
+        const elders = ((p.brand || '') + ' ' + (p.ref || '')).toLowerCase().includes(t);
+        if (pos < 0 && !elders) return null;
+        if (pos < 0) return { p, rang: 3 };                          // enkel in merk of referentie
+        if (pos === 0) return { p, rang: 0 };                        // begint ermee
+        return { p, rang: naam[pos - 1] === ' ' ? 1 : 2 };           // woordbegin, of ergens middenin
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.rang - b.rang || a.p.name.localeCompare(b.p.name, 'nl'))
+      .slice(0, limiet)
       .map(x => x.p);
   },
 
