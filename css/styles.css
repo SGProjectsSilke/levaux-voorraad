@@ -229,8 +229,8 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 .selectiebalk__weg[disabled] { opacity: .4; }
 #selectie-acties { display: flex; gap: 7px; flex-wrap: wrap; }
 
-.kaart--kiesbaar { cursor: pointer; }
-.kaart--gekozen { outline: 2px solid var(--rood); outline-offset: -2px; background: var(--rood-licht); }
+.kaart.kaart--kiesbaar { cursor: pointer; }
+.kaart.kaart--gekozen { outline: 2px solid var(--rood); outline-offset: -2px; background: var(--rood-licht); }
 .kaart__vink {
   width: 26px; height: 26px; flex: none;
   border-radius: 50%;
@@ -238,9 +238,11 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   display: grid; place-items: center;
   color: transparent; font-size: .85rem; font-weight: 700;
 }
-.kaart--gekozen .kaart__vink { background: var(--rood); border-color: var(--rood); color: var(--wit); }
-.kaart--kiezen { grid-template-columns: 26px 50px minmax(0, 1fr); }
-.kaart--kiezen .kaart__aantal { display: none; }
+.kaart.kaart--gekozen .kaart__vink { background: var(--rood); border-color: var(--rood); color: var(--wit); }
+/* let op: hogere specificiteit dan .kaart, anders wint de gewone
+   kolomindeling die verderop staat */
+.kaart.kaart--kiezen { grid-template-columns: 26px 50px minmax(0, 1fr); }
+.kaart.kaart--kiezen .kaart__aantal { display: none; }
 
 /* ---------- Productkaart ---------------------------------- */
 
