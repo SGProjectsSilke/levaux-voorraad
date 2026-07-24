@@ -183,6 +183,22 @@
       <h3>Minimumvoorraad</h3>
       <p>Elk product krijgt hier automatisch zijn minimum uit — of het nu van een bestelbon komt of je het zelf toevoegt. Pas je hier een aantal aan, dan volgen alle producten van dat soort meteen mee. Stel je bij één product zelf een minimum in, dan blijft dat staan.</p>
       <div id="regel-lijst"></div>
+
+      <details class="zonder-regel" id="zonder-regel" hidden>
+        <summary id="zonder-regel-kop"></summary>
+        <div id="zonder-regel-lijst"></div>
+      </details>
+
+      <div class="regel-toevoegen">
+        <div class="rij">
+          <div class="veld"><label for="nieuwe-regel">Woord</label>
+            <input type="text" id="nieuwe-regel" placeholder="schakelaar" autocomplete="off"></div>
+          <div class="veld knop--kort"><label for="nieuwe-regel-min">Minimum</label>
+            <input type="number" id="nieuwe-regel-min" inputmode="numeric" min="0" value="10"></div>
+        </div>
+        <button class="knop knop--zwart" id="btn-regel-toevoegen" type="button">Regel toevoegen</button>
+        <div class="veld__hulp">Staat dat woord in de naam van een product, dan krijgt het dit minimum. Eigen regels komen na de vaste, zodat een “schakelaar” geen differentieelschakelaar wegkaapt.</div>
+      </div>
     </div>
 
     <div class="paneel">

@@ -13,9 +13,10 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
 - **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen. Je hoeft niets in te stellen
 - **Bulk verwijderen** — selectiestand in de voorraadlijst; "Alles" werkt op wat er na je filters overblijft
-- **Minimums volledig automatisch** — elk nieuw product krijgt zijn minimum uit de regels, ook bij een bestelbon of na het hernoemen van een product. De aantallen per soort pas je aan bij Instellingen; alle producten van dat soort volgen meteen mee. Alleen een minimum dat je bij één product zelf instelt blijft met rust
+- **Minimums volledig automatisch** — elk nieuw product krijgt zijn minimum uit de regels, ook bij een bestelbon of na het hernoemen van een product. Past er geen regel, dan kijkt de app naar gelijkaardige producten die je al hebt staan en neemt die hun minimum over. De aantallen per soort pas je aan bij Instellingen; alle producten van dat soort volgen meteen mee, ook na een synchronisatie. Alleen een minimum dat je bij één product zelf instelt blijft met rust
+- **Eigen regels** — bij Instellingen zet je zelf een woord en een aantal ("schakelaar → 18"). Eigen regels komen ná de vaste, zodat ze de gaten vullen zonder iets weg te kapen. Eronder staat welke producten nog op geen enkele regel passen — precies de lijst die je nodig hebt om te zien welk woord ontbreekt
 - **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
-- **Eigen materiaal** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
+- **Eigen materiaal toevoegen** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
 - **Eenheden** — stuk, m, m², zak, pallet, rol, kg, doos, liter
 - **Bijbestellen** — alles onder het ingestelde minimum, gegroepeerd per leverancier, klaar om te kopiëren of te mailen
 - **Historiek** — elke beweging met datum, tijd en restant; exporteerbaar naar CSV
@@ -152,9 +153,24 @@ Opgeslagen gegevens van een oudere versie worden automatisch bijgewerkt (`migree
 
 ### Minimumregels
 
-`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De standaardaantallen staan daar; wijzigt de gebruiker er één, dan komt dat in `staat.minima` onder de sleutel van de regel — de code blijft dus de bron van de regels, de gebruiker die van de aantallen. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Onderaan die groep staat `Differentieel (rest)` als vangnet, voor namen waar geen mA bij staat — bewust ná `Automaat`, zodat een *differentieelautomaat* bij de automaten blijft horen. `Diff.` wordt als `differentieel` gelezen. Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld. Er is geen knop om regels "opnieuw toe te passen": ze worden automatisch toegepast bij het aanmaken van een product, bij het hernoemen ervan en zodra je bij Instellingen een aantal wijzigt. Alleen een product met `minAuto === false` (de gebruiker vulde zelf een minimum in) blijft buiten schot.
+`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Onderaan die groep staat `Differentieel (rest)` als vangnet — bewust ná `Automaat`, zodat een *differentieelautomaat* bij de automaten blijft horen.
+
+Namen worden eerst genormaliseerd (`normNaam`): kleine letters, accenten en leestekens weg. Omdat een koppelteken twee dingen kan betekenen, wordt elke naam in twee vormen getest: met spaties en aaneengeschreven (`naamVarianten`). Zo past `afdek-plaat` even goed als `afdekplaat`. En omdat Nederlandse meervouden de klinker veranderen, staat dat meervoud in de regex: `automa(at|ten)`, `kabelgo(ot|ten)`, `inbouwdo(os|zen)`.
+
+Er zijn drie bronnen voor het minimum van een nieuw product, in deze volgorde (`Store.minimumVoor`):
+
+1. **een regel** — vast of zelf toegevoegd
+2. **wat je al hebt staan** — past er geen regel, dan wordt gekeken naar gelijkaardige producten in de voorraad en het minimum genomen dat daar het vaakst voorkomt
+3. **niets** — dan blijft het 0 en zegt de app dat ook
+
+De gebruiker bezit de aantallen (`staat.minima`, met tijdstempels in `staat.minimaTs`) en mag zelf regels bijmaken (`staat.eigenRegels`: een woord plus een aantal). Eigen regels staan achteraan de lijst, zodat ze de gaten opvullen zonder de vaste regels opzij te duwen. `Store.zonderRegel()` geeft de producten waar niets op past — die lijst staat bij Instellingen, zodat zichtbaar is welk woord nog ontbreekt.
+
 
 Nieuwe soorten toevoegen: één regel bij in de lijst (met een eigen `key`), `DATAVERSIE` verhogen en in `migreer()` de regels opnieuw laten lopen.
+
+### Synchroniseren van de minimums
+
+Wijzigt een aantal, dan krijgen de meegewijzigde producten een nieuwe `gewijzigd`-stempel — anders reist die wijziging niet mee naar het andere toestel. Van de aantallen zelf houden we per regel bij wanneer ze gezet zijn (`minimaTs`), zodat bij het samenvoegen de laatste wijziging wint en niet het toestel dat toevallig het laatst opstart. Na elke `samenvoegen()` lopen alle producten met `minAuto !== false` nog eens langs de regels, zodat het resultaat niet van de volgorde afhangt.
 
 ### Verwijderen en synchroniseren
 

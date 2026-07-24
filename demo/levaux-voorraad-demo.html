@@ -716,6 +716,37 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   outline: none;
 }
 .regelrij input:focus { border-color: var(--rood); background: var(--wit); }
+.regelrij > span:first-child { flex: 1; min-width: 0; align-self: center; }
+/* eigen regels herken je aan het rode streepje ervoor */
+.regelrij--eigen > span:first-child {
+  border-left: 3px solid var(--rood);
+  padding-left: 8px; margin-left: -11px;
+}
+.regelrij__weg {
+  width: 26px; flex: none;
+  background: none; border: 0; padding: 0;
+  color: var(--grijs-400); font-size: 1.15rem; line-height: 1;
+}
+button.regelrij__weg:active { color: var(--rood); }
+
+.zonder-regel { margin-top: 12px; }
+.zonder-regel > summary {
+  font-size: .78rem; font-weight: 700; color: var(--oranje);
+  cursor: pointer; padding: 6px 0;
+}
+.zonder-regel__rij {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: .78rem; padding: 5px 0;
+  border-bottom: 1px solid var(--grijs-100);
+}
+.zonder-regel__rij b { font-variant-numeric: tabular-nums; color: var(--grijs-600); }
+
+.regel-toevoegen {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px dashed var(--grijs-200);
+}
+.regel-toevoegen .rij { align-items: flex-end; }
+.regel-toevoegen .knop--kort { flex: none; width: 96px; }
 
 /* ---------- Toast ------------------------------------------ */
 
@@ -930,6 +961,22 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <h3>Minimumvoorraad</h3>
       <p>Elk product krijgt hier automatisch zijn minimum uit — of het nu van een bestelbon komt of je het zelf toevoegt. Pas je hier een aantal aan, dan volgen alle producten van dat soort meteen mee. Stel je bij één product zelf een minimum in, dan blijft dat staan.</p>
       <div id="regel-lijst"></div>
+
+      <details class="zonder-regel" id="zonder-regel" hidden>
+        <summary id="zonder-regel-kop"></summary>
+        <div id="zonder-regel-lijst"></div>
+      </details>
+
+      <div class="regel-toevoegen">
+        <div class="rij">
+          <div class="veld"><label for="nieuwe-regel">Woord</label>
+            <input type="text" id="nieuwe-regel" placeholder="schakelaar" autocomplete="off"></div>
+          <div class="veld knop--kort"><label for="nieuwe-regel-min">Minimum</label>
+            <input type="number" id="nieuwe-regel-min" inputmode="numeric" min="0" value="10"></div>
+        </div>
+        <button class="knop knop--zwart" id="btn-regel-toevoegen" type="button">Regel toevoegen</button>
+        <div class="veld__hulp">Staat dat woord in de naam van een product, dan krijgt het dit minimum. Eigen regels komen na de vaste, zodat een “schakelaar” geen differentieelschakelaar wegkaapt.</div>
+      </div>
     </div>
 
     <div class="paneel">
@@ -1143,7 +1190,7 @@ window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-const VERSIE = '1.8.0';
+const VERSIE = '1.9.0';
 const DATAVERSIE = 7;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
@@ -1169,29 +1216,63 @@ const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'lit
    "Differentieelschakelaar", "Diff. 30mA". Eén herkenner voor alledrie. */
 const isDiff = t => /differentie/.test(t) || /\bdiff\.?\b/.test(t);
 
+/* Nederlandse meervouden veranderen de klinker: automaat → automaten,
+   kabelgoot → kabelgoten, doos → dozen. Zoeken op het enkelvoud alleen
+   laat die dus liggen. Daarom staat het meervoud er telkens bij. */
+const OPBOUWDOOS  = /opbouwdo(os|zen)/;
+const INBOUWDOOS  = /inbouwdo(os|zen)/;
+
 const MINIMUMREGELS = [
   { key: 'diff300',     label: 'Differentieel 300mA', min: 5,  test: t => isDiff(t) && /300\s*ma/.test(t) },
   { key: 'diff30',      label: 'Differentieel 30mA',  min: 10, test: t => isDiff(t) && /(^|[^0])30\s*ma/.test(t) },
-  { key: 'hydrodoos',   label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
-  { key: 'inbouwdoos',  label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
-  { key: 'automaat',    label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  { key: 'hydrodoos',   label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && OPBOUWDOOS.test(t) },
+  { key: 'inbouwdoos',  label: 'Inbouwdoos',          min: 10, test: t => INBOUWDOOS.test(t) },
+  { key: 'automaat',    label: 'Automaat',            min: 15, test: t => /automa(at|ten)/.test(t) },
   // Vangnet: staat er "differentieel" zonder dat er 30 of 300 mA bij staat,
   // dan geldt dit aantal. Bewust ná 'automaat', zodat een
   // differentieelautomaat bij de automaten blijft horen.
   { key: 'diff',        label: 'Differentieel (rest)', min: 10, test: isDiff },
-  { key: 'afdekplaat',  label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
+  { key: 'afdekplaat',  label: 'Afdekplaat',          min: 25, test: t => /afdekpla(at|ten)/.test(t) },
   { key: 'stopcontact', label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
-  { key: 'toets',       label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
-  { key: 'kabelgoot',   label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
-  { key: 'infrarood',   label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
+  // geen woordgrens: op een bon staat evengoed "bedieningstoets"
+  { key: 'toets',       label: 'Toets',               min: 20, test: t => /toets/.test(t) },
+  { key: 'kabelgoot',   label: 'Kabelgoot',           min: 5,  test: t => /kabelgo(ot|ten)/.test(t) },
+  { key: 'infrarood',   label: 'Infrarood',           min: 2,  test: t => /infrarood|\bir\b/.test(t) },
   { key: 'dimmer',      label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
   { key: 'verdeelkast', label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
 ];
 
+/* Productnamen komen uit tekstherkenning en uit vier verschillende
+   leverancierscatalogi. Voor we ze langs de regels sturen, halen we de
+   verschillen eruit die niets betekenen: accenten, koppeltekens,
+   dubbele spaties. Zo past "afdek-plaat" en "AFDEKPLAAT" evengoed. */
+function normNaam(tekst) {
+  return String(tekst || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')     // é → e
+    .replace(/[-_/\\.,;:()[\]]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* Een koppelteken kan twee dingen betekenen: een echt streepje tussen twee
+   woorden ("3-voudig") of een gebroken samenstelling ("afdek-plaat"). We
+   weten niet welk van de twee, dus proberen we het allebei: één keer met
+   spaties en één keer aaneengeschreven. */
+function naamVarianten(...delen) {
+  const t = normNaam(delen.filter(Boolean).join(' '));
+  return t ? [t, t.replace(/ /g, '')] : [];
+}
+
+function past(regel, varianten) {
+  return varianten.some(v => regel.test(v));
+}
+
 /** Welke regel past bij deze productnaam? (zonder eigen aantallen) */
 function zoekRegel(...delen) {
-  const t = delen.filter(Boolean).join(' ').toLowerCase();
-  return MINIMUMREGELS.find(r => r.test(t)) || null;
+  const v = naamVarianten(...delen);
+  if (!v.length) return null;
+  return MINIMUMREGELS.find(r => past(r, v)) || null;
 }
 
 const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Gebruiksmaterialen';
@@ -1314,6 +1395,7 @@ function legeStaat() {
     ],
     orders: [],
     minima: {},          // eigen aantallen per minimumregel
+    eigenRegels: [],     // zelf toegevoegde regels: { key, woord, min }
     // Verwijderde producten laten een spoor na. Zonder dat spoor komt een
     // product dat je hier wist gewoon terug zodra een ander toestel zijn
     // versie naar de cloud stuurt.
@@ -1369,6 +1451,7 @@ function migreer(staat) {
     });
     staat.versie = 7;
   }
+  if (!Array.isArray(staat.eigenRegels)) staat.eigenRegels = [];
   return staat;
 }
 
@@ -1491,7 +1574,9 @@ const Store = {
   async voegProductToe(data) {
     const leverancier = data.leverancier || '';
     const ref = data.ref || this.eigenRef(leverancier);
-    const regel = this.regelVoor(data.brand, data.name);
+    // Geen eigen minimum meegegeven? Dan kijkt de app zelf: eerst de regels,
+    // en anders wat gelijkaardige producten in de voorraad al hebben staan.
+    const gevonden = this.minimumVoor(data.brand, data.name);
     const p = {
       id: id(),
       ref,
@@ -1500,7 +1585,7 @@ const Store = {
       name: data.name || 'Naamloos product',
       qty: Number(data.qty) || 0,
       // niets ingevuld? dan geldt de afgesproken regel voor dit soort product
-      min: Number(data.min) || regel?.min || 0,
+      min: Number(data.min) || gevonden.min || 0,
       // minAuto = "de gebruiker heeft hier zelf niets ingesteld", ook als er
       // (nog) geen regel op past. Anders volgt het product later niet mee
       // wanneer de naam verandert of er een regel bijkomt.
@@ -1532,8 +1617,8 @@ const Store = {
     // Andere naam kan een ander soort product betekenen: dan geldt de regel
     // van dat soort weer — tenzij je het minimum zelf hebt ingesteld.
     if (naamWijzigt && p.minAuto !== false) {
-      const regel = this.regelVoor(p.brand, p.name);
-      if (regel) { p.min = regel.min; p.minAuto = true; }
+      const gevonden = this.minimumVoor(p.brand, p.name, p.id);
+      if (gevonden.bron !== 'geen') { p.min = gevonden.min; p.minAuto = true; }
     }
     p.qty = Math.max(0, Number(p.qty) || 0);
     p.gewijzigd = new Date().toISOString();
@@ -1658,33 +1743,123 @@ const Store = {
     return { bij, nieuw, order };
   },
 
-  /** De regels zoals ze nu gelden, met de aantallen die jij hebt ingesteld. */
+  /**
+   * Alle regels die nu gelden: eerst de vaste, dan die van jou.
+   * Eigen regels staan achteraan: ze vullen de gaten op, ze duwen de vaste
+   * regels niet opzij. Anders zou een eigen regel "schakelaar" ook een
+   * differentieelschakelaar inpikken.
+   */
   regels() {
-    return MINIMUMREGELS.map(r => ({ ...r, min: this.staat.minima?.[r.key] ?? r.min }));
+    const vast = MINIMUMREGELS.map(r => ({ ...r, min: this.staat.minima?.[r.key] ?? r.min, eigen: false }));
+    const eigen = (this.staat.eigenRegels || []).map(r => ({
+      key: r.key,
+      label: r.woord,
+      woord: r.woord,
+      min: this.staat.minima?.[r.key] ?? r.min,
+      eigen: true,
+      test: t => t.includes(normNaam(r.woord))
+    }));
+    return [...vast, ...eigen];
   },
 
-  /** Het afgesproken minimum bij een productnaam. */
+  /** Het afgesproken minimum bij een productnaam — vaste én eigen regels. */
   regelVoor(...delen) {
-    const r = zoekRegel(...delen);
-    return r ? { ...r, min: this.staat.minima?.[r.key] ?? r.min } : null;
+    const v = naamVarianten(...delen);
+    if (!v.length) return null;
+    return this.regels().find(r => v.some(x => r.test(x))) || null;
+  },
+
+  /**
+   * Producten die op geen enkele regel passen. Handig om te zien welk woord
+   * er nog ontbreekt — daar kan je dan zelf een regel voor maken.
+   */
+  zonderRegel() {
+    return this.staat.producten.filter(p => !this.regelVoor(p.brand, p.name));
+  },
+
+  /**
+   * Geen regel gevonden? Kijk dan naar wat er al in de voorraad staat.
+   * Typ je "Schakelaar" en je hebt al schakelaars met minimum 12 liggen,
+   * dan is 12 een beter antwoord dan 0. We nemen het aantal dat het
+   * vaakst voorkomt bij de gelijkaardige producten.
+   */
+  geleerdMinimum(naam, negeerId = '') {
+    const buren = this.gelijkaardig(naam, negeerId).filter(p => p.min > 0);
+    if (!buren.length) return null;
+    const tel = {};
+    buren.forEach(p => { tel[p.min] = (tel[p.min] || 0) + 1; });
+    const beste = Object.entries(tel).sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))[0];
+    return { min: Number(beste[0]), aantal: buren.length, voorbeeld: buren[0] };
+  },
+
+  /**
+   * Waar komt het minimum voor dit product vandaan?
+   * @returns {{min:number, bron:'regel'|'geleerd'|'geen', regel?:object, geleerd?:object}}
+   */
+  minimumVoor(merk, naam, negeerId = '') {
+    const regel = this.regelVoor(merk, naam);
+    if (regel) return { min: regel.min, bron: 'regel', regel };
+    const geleerd = this.geleerdMinimum([merk, naam].filter(Boolean).join(' '), negeerId);
+    if (geleerd) return { min: geleerd.min, bron: 'geleerd', geleerd };
+    return { min: 0, bron: 'geen' };
   },
 
   /** Een minimum aanpassen; producten die op die regel draaien volgen mee. */
   async zetMinimum(key, waarde) {
-    const regel = MINIMUMREGELS.find(r => r.key === key);
+    const regel = this.regels().find(r => r.key === key);
     if (!regel) return 0;
+    const standaard = MINIMUMREGELS.find(r => r.key === key)?.min
+                   ?? (this.staat.eigenRegels || []).find(r => r.key === key)?.min;
     const n = Math.max(0, parseInt(waarde, 10) || 0);
+    const nu = new Date().toISOString();
     this.staat.minima = this.staat.minima || {};
-    if (n === regel.min) delete this.staat.minima[key];
+    this.staat.minimaTs = this.staat.minimaTs || {};
+    if (n === standaard) delete this.staat.minima[key];
     else this.staat.minima[key] = n;
+    // tijdstip erbij, zodat bij het synchroniseren de laatste wijziging wint
+    // en niet gewoon het toestel dat toevallig als laatste opstart
+    this.staat.minimaTs[key] = nu;
 
     let bij = 0;
     this.staat.producten.forEach(p => {
       if (p.minAuto === false) return;
-      if (zoekRegel(p.brand, p.name)?.key === key && p.min !== n) { p.min = n; p.minAuto = true; bij++; }
+      if (this.regelVoor(p.brand, p.name)?.key === key && p.min !== n) {
+        p.min = n; p.minAuto = true; p.gewijzigd = nu; bij++;   // stempel, anders reist het niet mee
+      }
     });
     await this.bewaar();
     return bij;
+  },
+
+  /** Een eigen regel: een woord en het aantal dat daarbij hoort. */
+  async voegRegelToe(woord, waarde) {
+    const w = String(woord || '').trim();
+    if (!w) throw new Error('Geef een woord in, bijvoorbeeld "schakelaar".');
+    if (w.length < 3) throw new Error('Neem een woord van minstens drie letters, anders past het overal op.');
+    const bestaat = this.regels().some(r => (r.woord || r.label).toLowerCase() === w.toLowerCase());
+    if (bestaat) throw new Error(`Er is al een regel voor "${w}".`);
+
+    this.staat.eigenRegels = this.staat.eigenRegels || [];
+    const regel = { key: 'eigen-' + normRef(w).toLowerCase() + '-' + Math.random().toString(36).slice(2, 6),
+                    woord: w, min: Math.max(0, parseInt(waarde, 10) || 0) };
+    this.staat.eigenRegels.push(regel);
+
+    // meteen toepassen op wat er al ligt en nog geen eigen minimum heeft
+    let bij = 0;
+    this.staat.producten.forEach(p => {
+      if (p.minAuto === false) return;
+      if (this.regelVoor(p.brand, p.name)?.key === regel.key && p.min !== regel.min) {
+        p.min = regel.min; p.minAuto = true; bij++;
+      }
+    });
+    await this.bewaar();
+    return { regel, bij };
+  },
+
+  async verwijderRegel(key) {
+    this.staat.eigenRegels = (this.staat.eigenRegels || []).filter(r => r.key !== key);
+    if (this.staat.minima) delete this.staat.minima[key];
+    await this.bewaar();
   },
 
   /** Past de minimumregels opnieuw toe. Zelf ingestelde minimums blijven. */
@@ -1896,7 +2071,36 @@ const Store = {
         this.staat.leveranciers.push(l);
       }
     });
-    if (ander.minima) this.staat.minima = { ...ander.minima, ...this.staat.minima };
+    // Ingestelde aantallen: per regel wint de laatste wijziging, niet het
+    // toestel dat toevallig het laatst synchroniseert.
+    this.staat.minima = this.staat.minima || {};
+    this.staat.minimaTs = this.staat.minimaTs || {};
+    Object.keys({ ...(ander.minima || {}), ...(ander.minimaTs || {}) }).forEach(k => {
+      const hunTs = ander.minimaTs?.[k] || '';
+      const mijnTs = this.staat.minimaTs[k] || '';
+      const ikKen = k in this.staat.minima;
+      if (!ikKen || hunTs > mijnTs) {
+        if (k in (ander.minima || {})) this.staat.minima[k] = ander.minima[k];
+        else delete this.staat.minima[k];
+        if (hunTs) this.staat.minimaTs[k] = hunTs;
+      }
+    });
+
+    // eigen regels van het andere toestel erbij, op sleutel ontdubbeld
+    (ander.eigenRegels || []).forEach(r => {
+      if (!(this.staat.eigenRegels || []).some(x => x.key === r.key)) {
+        (this.staat.eigenRegels = this.staat.eigenRegels || []).push(r);
+      }
+    });
+
+    // Na het samenvoegen kunnen er regels bij zijn gekomen of aantallen
+    // gewijzigd. Alles wat nog op automatisch staat, loopt er opnieuw langs —
+    // zo staat na een sync overal hetzelfde, ongeacht de volgorde.
+    this.staat.producten.forEach(p => {
+      if (p.minAuto === false) return;
+      const regel = this.regelVoor(p.brand, p.name);
+      if (regel && p.min !== regel.min) { p.min = regel.min; p.minAuto = true; }
+    });
     (ander.orders || []).forEach(o => {
       if (!this.staat.orders.some(x => x.id === o.id)) this.staat.orders.push(o);
     });
@@ -3237,21 +3441,32 @@ function markeer(tekst, stuk) {
  */
 function vulMinimumIn() {
   const veld = $('#b-min');
-  if (veld.dataset.auto === '1') {
-    const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
-    veld.value = regel ? regel.min : 0;
-  }
+  if (veld.dataset.auto === '1') veld.value = huidigeMin().min;
   tekenMinHulp();
+}
+
+function huidigeMin() {
+  return Store.minimumVoor($('#b-merk').value, $('#b-naam').value, bewerkId || '');
 }
 
 /** Legt onder het veld uit waar dat getal vandaan komt. */
 function tekenMinHulp() {
   const el = $('#b-min-hulp');
-  const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
+  const g = huidigeMin();
   const auto = $('#b-min').dataset.auto === '1';
-  if (regel && auto) el.innerHTML = `Vaste regel <b>${ontsnap(regel.label)}</b> → minimum ${regel.min}. Wijzig je het hier, dan geldt dat enkel voor dit product.`;
-  else if (regel) el.innerHTML = `Zelf ingesteld. De vaste regel <b>${ontsnap(regel.label)}</b> (${regel.min}) laat dit product met rust.`;
-  else el.textContent = 'Geen vaste regel voor dit soort — vul zelf in vanaf wanneer je wil bijbestellen.';
+
+  if (!auto) {
+    el.innerHTML = g.bron === 'geen'
+      ? 'Zelf ingesteld voor dit product.'
+      : `Zelf ingesteld. Het voorstel van de app (${g.min}) laat dit product met rust.`;
+  } else if (g.bron === 'regel') {
+    el.innerHTML = `Regel <b>${ontsnap(g.regel.label)}</b> → minimum ${g.min}. Wijzig je het hier, dan geldt dat enkel voor dit product.`;
+  } else if (g.bron === 'geleerd') {
+    const v = ontsnap([g.geleerd.voorbeeld.brand, g.geleerd.voorbeeld.name].filter(Boolean).join(' '));
+    el.innerHTML = `Overgenomen van wat je al hebt staan — <b>${v}</b> staat op ${g.min}. Klopt dat niet, wijzig het hier of maak er een vaste regel van bij Instellingen.`;
+  } else {
+    el.textContent = 'Nog geen regel en niets vergelijkbaars in je voorraad — vul zelf in vanaf wanneer je wil bijbestellen.';
+  }
   el.hidden = false;
 }
 
@@ -3723,6 +3938,20 @@ function bindInstellingen() {
     melding('Leverancier toegevoegd.');
   });
 
+  $('#btn-regel-toevoegen').addEventListener('click', async () => {
+    try {
+      const { regel, bij } = await Store.voegRegelToe($('#nieuwe-regel').value, $('#nieuwe-regel-min').value);
+      $('#nieuwe-regel').value = '';
+      $('#nieuwe-regel-min').value = 10;
+      tekenRegels();
+      melding(bij
+        ? `Regel "${regel.woord}" toegevoegd · ${bij} bestaand product${bij === 1 ? '' : 'en'} aangepast.`
+        : `Regel "${regel.woord}" toegevoegd.`);
+    } catch (e) {
+      melding(e.message);
+    }
+  });
+
   $('#btn-backup').addEventListener('click', () => {
     download('levaux-voorraad-backup-' + datumStempel() + '.json', Store.exportJson(), 'application/json');
     melding('Back-up gedownload.');
@@ -3762,9 +3991,10 @@ function tekenRegels() {
   const el = $('#regel-lijst');
   if (!el) return;
   el.innerHTML = Store.regels().map(r => `
-    <div class="regelrij">
+    <div class="regelrij${r.eigen ? ' regelrij--eigen' : ''}">
       <span>${ontsnap(r.label)}</span>
       <input type="number" inputmode="numeric" min="0" value="${r.min}" data-regel="${r.key}" aria-label="Minimum voor ${ontsnap(r.label)}">
+      ${r.eigen ? `<button type="button" class="regelrij__weg" data-weg="${r.key}" aria-label="Regel ${ontsnap(r.label)} verwijderen">×</button>` : '<span class="regelrij__weg"></span>'}
     </div>`).join('');
 
   el.onchange = async e => {
@@ -3773,6 +4003,41 @@ function tekenRegels() {
     const n = await Store.zetMinimum(key, e.target.value);
     melding(n ? `Aangepast · ${n} product${n === 1 ? '' : 'en'} volgen mee.` : 'Aangepast.');
   };
+
+  el.onclick = async e => {
+    const key = e.target.closest('[data-weg]')?.dataset.weg;
+    if (!key) return;
+    const regel = Store.regels().find(r => r.key === key);
+    if (!confirm(`Regel "${regel?.label}" verwijderen? De minimums die al ingevuld staan, blijven zoals ze zijn.`)) return;
+    await Store.verwijderRegel(key);
+    tekenRegels();
+    melding('Regel verwijderd.');
+  };
+
+  tekenZonderRegel();
+}
+
+/**
+ * Welke producten passen op geen enkele regel? Dat is precies de lijst die
+ * je nodig hebt om te zien welk woord er nog ontbreekt.
+ */
+function tekenZonderRegel() {
+  const doos = $('#zonder-regel');
+  if (!doos) return;
+  const lijst = Store.zonderRegel();
+  doos.hidden = !lijst.length;
+  if (!lijst.length) return;
+
+  $('#zonder-regel-kop').textContent = lijst.length === 1
+    ? '1 product volgt nog geen regel — bekijken'
+    : `${lijst.length} producten volgen nog geen regel — bekijken`;
+  $('#zonder-regel-lijst').innerHTML = lijst
+    .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
+    .map(p => `<div class="zonder-regel__rij">
+        <span>${ontsnap([p.brand, p.name].filter(Boolean).join(' '))}</span>
+        <b>${p.min || '—'}</b>
+      </div>`).join('') +
+    '<div class="veld__hulp">Tik hierboven een woord uit deze namen in om er een regel van te maken.</div>';
 }
 
 function tekenOpslag() {

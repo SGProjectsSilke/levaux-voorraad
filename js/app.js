@@ -557,21 +557,32 @@ function markeer(tekst, stuk) {
  */
 function vulMinimumIn() {
   const veld = $('#b-min');
-  if (veld.dataset.auto === '1') {
-    const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
-    veld.value = regel ? regel.min : 0;
-  }
+  if (veld.dataset.auto === '1') veld.value = huidigeMin().min;
   tekenMinHulp();
+}
+
+function huidigeMin() {
+  return Store.minimumVoor($('#b-merk').value, $('#b-naam').value, bewerkId || '');
 }
 
 /** Legt onder het veld uit waar dat getal vandaan komt. */
 function tekenMinHulp() {
   const el = $('#b-min-hulp');
-  const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
+  const g = huidigeMin();
   const auto = $('#b-min').dataset.auto === '1';
-  if (regel && auto) el.innerHTML = `Vaste regel <b>${ontsnap(regel.label)}</b> → minimum ${regel.min}. Wijzig je het hier, dan geldt dat enkel voor dit product.`;
-  else if (regel) el.innerHTML = `Zelf ingesteld. De vaste regel <b>${ontsnap(regel.label)}</b> (${regel.min}) laat dit product met rust.`;
-  else el.textContent = 'Geen vaste regel voor dit soort — vul zelf in vanaf wanneer je wil bijbestellen.';
+
+  if (!auto) {
+    el.innerHTML = g.bron === 'geen'
+      ? 'Zelf ingesteld voor dit product.'
+      : `Zelf ingesteld. Het voorstel van de app (${g.min}) laat dit product met rust.`;
+  } else if (g.bron === 'regel') {
+    el.innerHTML = `Regel <b>${ontsnap(g.regel.label)}</b> → minimum ${g.min}. Wijzig je het hier, dan geldt dat enkel voor dit product.`;
+  } else if (g.bron === 'geleerd') {
+    const v = ontsnap([g.geleerd.voorbeeld.brand, g.geleerd.voorbeeld.name].filter(Boolean).join(' '));
+    el.innerHTML = `Overgenomen van wat je al hebt staan — <b>${v}</b> staat op ${g.min}. Klopt dat niet, wijzig het hier of maak er een vaste regel van bij Instellingen.`;
+  } else {
+    el.textContent = 'Nog geen regel en niets vergelijkbaars in je voorraad — vul zelf in vanaf wanneer je wil bijbestellen.';
+  }
   el.hidden = false;
 }
 
@@ -1043,6 +1054,20 @@ function bindInstellingen() {
     melding('Leverancier toegevoegd.');
   });
 
+  $('#btn-regel-toevoegen').addEventListener('click', async () => {
+    try {
+      const { regel, bij } = await Store.voegRegelToe($('#nieuwe-regel').value, $('#nieuwe-regel-min').value);
+      $('#nieuwe-regel').value = '';
+      $('#nieuwe-regel-min').value = 10;
+      tekenRegels();
+      melding(bij
+        ? `Regel "${regel.woord}" toegevoegd · ${bij} bestaand product${bij === 1 ? '' : 'en'} aangepast.`
+        : `Regel "${regel.woord}" toegevoegd.`);
+    } catch (e) {
+      melding(e.message);
+    }
+  });
+
   $('#btn-backup').addEventListener('click', () => {
     download('levaux-voorraad-backup-' + datumStempel() + '.json', Store.exportJson(), 'application/json');
     melding('Back-up gedownload.');
@@ -1082,9 +1107,10 @@ function tekenRegels() {
   const el = $('#regel-lijst');
   if (!el) return;
   el.innerHTML = Store.regels().map(r => `
-    <div class="regelrij">
+    <div class="regelrij${r.eigen ? ' regelrij--eigen' : ''}">
       <span>${ontsnap(r.label)}</span>
       <input type="number" inputmode="numeric" min="0" value="${r.min}" data-regel="${r.key}" aria-label="Minimum voor ${ontsnap(r.label)}">
+      ${r.eigen ? `<button type="button" class="regelrij__weg" data-weg="${r.key}" aria-label="Regel ${ontsnap(r.label)} verwijderen">×</button>` : '<span class="regelrij__weg"></span>'}
     </div>`).join('');
 
   el.onchange = async e => {
@@ -1093,6 +1119,41 @@ function tekenRegels() {
     const n = await Store.zetMinimum(key, e.target.value);
     melding(n ? `Aangepast · ${n} product${n === 1 ? '' : 'en'} volgen mee.` : 'Aangepast.');
   };
+
+  el.onclick = async e => {
+    const key = e.target.closest('[data-weg]')?.dataset.weg;
+    if (!key) return;
+    const regel = Store.regels().find(r => r.key === key);
+    if (!confirm(`Regel "${regel?.label}" verwijderen? De minimums die al ingevuld staan, blijven zoals ze zijn.`)) return;
+    await Store.verwijderRegel(key);
+    tekenRegels();
+    melding('Regel verwijderd.');
+  };
+
+  tekenZonderRegel();
+}
+
+/**
+ * Welke producten passen op geen enkele regel? Dat is precies de lijst die
+ * je nodig hebt om te zien welk woord er nog ontbreekt.
+ */
+function tekenZonderRegel() {
+  const doos = $('#zonder-regel');
+  if (!doos) return;
+  const lijst = Store.zonderRegel();
+  doos.hidden = !lijst.length;
+  if (!lijst.length) return;
+
+  $('#zonder-regel-kop').textContent = lijst.length === 1
+    ? '1 product volgt nog geen regel — bekijken'
+    : `${lijst.length} producten volgen nog geen regel — bekijken`;
+  $('#zonder-regel-lijst').innerHTML = lijst
+    .sort((a, b) => a.name.localeCompare(b.name, 'nl'))
+    .map(p => `<div class="zonder-regel__rij">
+        <span>${ontsnap([p.brand, p.name].filter(Boolean).join(' '))}</span>
+        <b>${p.min || '—'}</b>
+      </div>`).join('') +
+    '<div class="veld__hulp">Tik hierboven een woord uit deze namen in om er een regel van te maken.</div>';
 }
 
 function tekenOpslag() {

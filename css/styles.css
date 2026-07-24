@@ -703,6 +703,37 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   outline: none;
 }
 .regelrij input:focus { border-color: var(--rood); background: var(--wit); }
+.regelrij > span:first-child { flex: 1; min-width: 0; align-self: center; }
+/* eigen regels herken je aan het rode streepje ervoor */
+.regelrij--eigen > span:first-child {
+  border-left: 3px solid var(--rood);
+  padding-left: 8px; margin-left: -11px;
+}
+.regelrij__weg {
+  width: 26px; flex: none;
+  background: none; border: 0; padding: 0;
+  color: var(--grijs-400); font-size: 1.15rem; line-height: 1;
+}
+button.regelrij__weg:active { color: var(--rood); }
+
+.zonder-regel { margin-top: 12px; }
+.zonder-regel > summary {
+  font-size: .78rem; font-weight: 700; color: var(--oranje);
+  cursor: pointer; padding: 6px 0;
+}
+.zonder-regel__rij {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: .78rem; padding: 5px 0;
+  border-bottom: 1px solid var(--grijs-100);
+}
+.zonder-regel__rij b { font-variant-numeric: tabular-nums; color: var(--grijs-600); }
+
+.regel-toevoegen {
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px dashed var(--grijs-200);
+}
+.regel-toevoegen .rij { align-items: flex-end; }
+.regel-toevoegen .knop--kort { flex: none; width: 96px; }
 
 /* ---------- Toast ------------------------------------------ */
 
