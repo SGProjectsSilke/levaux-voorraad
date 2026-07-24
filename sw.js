@@ -1,7 +1,7 @@
 /* Service worker — zorgt dat de app ook zonder internet opent.
    Verhoog CACHE bij elke nieuwe versie, anders blijft de oude app hangen. */
 
-const CACHE = 'levaux-voorraad-v11';
+const CACHE = 'levaux-voorraad-v12';
 const BESTANDEN = [
   './',
   './index.html',

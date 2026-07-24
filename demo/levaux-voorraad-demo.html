@@ -413,7 +413,7 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 /* bewerkbare lijstjes bij Instellingen */
 .beheerrij {
   display: grid;
-  grid-template-columns: 1fr 34% 30px;
+  grid-template-columns: 1fr 40% 30px;
   gap: 8px;
   align-items: center;
   padding: 9px 0;
@@ -438,7 +438,6 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 }
 .beheerrij__weg:active { background: var(--grijs-100); }
 .beheerrij__weg[data-vast] { color: var(--grijs-200); }
-.beheerrij__formaat { grid-column: 1 / 3; font-size: .78rem !important; }
 .beheerrij small {
   grid-column: 1 / -1;
   font-size: .68rem; color: var(--grijs-400);
@@ -698,6 +697,17 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   font-size: .84rem;
 }
 .regelrij b { font-variant-numeric: tabular-nums; }
+.regelrij input {
+  width: 68px; flex: none;
+  text-align: center; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 4px;
+  border: 1.5px solid var(--grijs-200);
+  border-radius: 8px;
+  background: var(--grijs-50);
+  outline: none;
+}
+.regelrij input:focus { border-color: var(--rood); background: var(--wit); }
 
 /* ---------- Toast ------------------------------------------ */
 
@@ -897,7 +907,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
     <div class="paneel">
       <h3>Leveranciers</h3>
-      <p>Bij elke leverancier hoort een standaardcategorie en het soort orderlijst. <strong>Kaartjes</strong> is de Cebeo-app; <strong>tabel</strong> is een lijst met artikelnummer, aantal en prijs naast elkaar.</p>
+      <p>Bij elke leverancier hoort een standaardcategorie: die staat dan meteen goed bij nieuwe producten van hem. Hoe zijn bestelbon eruitziet zoekt de app zelf uit.</p>
       <div id="lev-lijst"></div>
       <div class="veld" style="margin:12px 0 8px">
         <input type="text" id="nieuwe-lev" placeholder="Naam nieuwe leverancier">
@@ -910,7 +920,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
     <div class="paneel">
       <h3>Minimumvoorraad</h3>
-      <p>Per soort materiaal ligt vast wanneer je wil bijbestellen. Nieuwe producten krijgen dat minimum automatisch. Stel je bij een product zelf een minimum in, dan blijft dat staan.</p>
+      <p>Per soort materiaal ligt vast wanneer je wil bijbestellen. Pas je hier een aantal aan, dan volgen alle producten van dat soort meteen mee. Stel je bij één product zelf een minimum in, dan blijft dat staan.</p>
       <div id="regel-lijst"></div>
       <button class="knop knop--leeg" id="btn-regels-toepassen" style="margin-top:12px">Regels opnieuw toepassen</button>
     </div>
@@ -1125,8 +1135,8 @@ window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-const VERSIE = '1.6.0';
-const DATAVERSIE = 5;
+const VERSIE = '1.7.0';
+const DATAVERSIE = 6;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 const HOOFDCATEGORIEEN = [
@@ -1148,25 +1158,22 @@ const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'lit
 ------------------------------------------------------------ */
 
 const MINIMUMREGELS = [
-  { label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
-  { label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
-  { label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
-  { label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
-  { label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
-  { label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
-  { label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
-  { label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
-  { label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
-  { label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
-  { label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
-  { label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
+  { key: 'diff300',     label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
+  { key: 'diff30',      label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
+  { key: 'hydrodoos',   label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
+  { key: 'inbouwdoos',  label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
+  { key: 'automaat',    label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  { key: 'afdekplaat',  label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
+  { key: 'stopcontact', label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
+  { key: 'toets',       label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
+  { key: 'kabelgoot',   label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
+  { key: 'infrarood',   label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
+  { key: 'dimmer',      label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
+  { key: 'verdeelkast', label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
 ];
 
-/**
- * Zoekt het afgesproken minimum bij een productnaam.
- * @returns {{min:number, label:string}|null}
- */
-function regelVoor(...delen) {
+/** Welke regel past bij deze productnaam? (zonder eigen aantallen) */
+function zoekRegel(...delen) {
   const t = delen.filter(Boolean).join(' ').toLowerCase();
   return MINIMUMREGELS.find(r => r.test(t)) || null;
 }
@@ -1290,6 +1297,7 @@ function legeStaat() {
       { naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' }
     ],
     orders: [],
+    minima: {},          // eigen aantallen per minimumregel
     // Verwijderde producten laten een spoor na. Zonder dat spoor komt een
     // product dat je hier wist gewoon terug zodra een ander toestel zijn
     // versie naar de cloud stuurt.
@@ -1321,14 +1329,19 @@ function migreer(staat) {
   if (!Array.isArray(staat.verwijderd)) staat.verwijderd = [];
   if (staat.versie < 4) {
     staat.producten.forEach(p => {
-      const regel = regelVoor(p.brand, p.name);
-      if (regel) { p.min = regel.min; p.minAuto = true; }
+      const regel = zoekRegel(p.brand, p.name);
+      if (regel) { p.min = staat.minima?.[regel.key] ?? regel.min; p.minAuto = true; }
     });
     staat.versie = 4;
   }
+  if (!staat.minima) staat.minima = {};
   if (staat.versie < 5) {
     staat.verwijderd = staat.verwijderd || [];
     staat.versie = 5;
+  }
+  if (staat.versie < 6) {
+    staat.minima = staat.minima || {};
+    staat.versie = 6;
   }
   return staat;
 }
@@ -1362,7 +1375,7 @@ const Store = {
       const seed = window.__SEED__ || await fetch(seedUrl).then(r => r.json());
       const nu = new Date().toISOString();
       seed.products.forEach(p => {
-        const regel = regelVoor(p.brand, p.name);
+        const regel = this.regelVoor(p.brand, p.name);
         this.staat.producten.push({
           id: id(),
           ref: p.ref,
@@ -1452,7 +1465,7 @@ const Store = {
   async voegProductToe(data) {
     const leverancier = data.leverancier || '';
     const ref = data.ref || this.eigenRef(leverancier);
-    const regel = regelVoor(data.brand, data.name);
+    const regel = this.regelVoor(data.brand, data.name);
     const p = {
       id: id(),
       ref,
@@ -1607,12 +1620,41 @@ const Store = {
     return { bij, nieuw, order };
   },
 
+  /** De regels zoals ze nu gelden, met de aantallen die jij hebt ingesteld. */
+  regels() {
+    return MINIMUMREGELS.map(r => ({ ...r, min: this.staat.minima?.[r.key] ?? r.min }));
+  },
+
+  /** Het afgesproken minimum bij een productnaam. */
+  regelVoor(...delen) {
+    const r = zoekRegel(...delen);
+    return r ? { ...r, min: this.staat.minima?.[r.key] ?? r.min } : null;
+  },
+
+  /** Een minimum aanpassen; producten die op die regel draaien volgen mee. */
+  async zetMinimum(key, waarde) {
+    const regel = MINIMUMREGELS.find(r => r.key === key);
+    if (!regel) return 0;
+    const n = Math.max(0, parseInt(waarde, 10) || 0);
+    this.staat.minima = this.staat.minima || {};
+    if (n === regel.min) delete this.staat.minima[key];
+    else this.staat.minima[key] = n;
+
+    let bij = 0;
+    this.staat.producten.forEach(p => {
+      if (p.minAuto === false) return;
+      if (zoekRegel(p.brand, p.name)?.key === key && p.min !== n) { p.min = n; p.minAuto = true; bij++; }
+    });
+    await this.bewaar();
+    return bij;
+  },
+
   /** Past de minimumregels opnieuw toe. Zelf ingestelde minimums blijven. */
   async pasRegelsToe({ ookHandmatig = false } = {}) {
     let n = 0;
     this.staat.producten.forEach(p => {
       if (!ookHandmatig && p.minAuto === false) return;
-      const regel = regelVoor(p.brand, p.name);
+      const regel = this.regelVoor(p.brand, p.name);
       if (regel && p.min !== regel.min) { p.min = regel.min; p.minAuto = true; n++; }
     });
     if (n) await this.bewaar();
@@ -1787,6 +1829,7 @@ const Store = {
         this.staat.leveranciers.push(l);
       }
     });
+    if (ander.minima) this.staat.minima = { ...ander.minima, ...this.staat.minima };
     (ander.orders || []).forEach(o => {
       if (!this.staat.orders.some(x => x.id === o.id)) this.staat.orders.push(o);
     });
@@ -3062,7 +3105,7 @@ function bindBewerkModal() {
     // het afgesproken minimum meteen invullen, zolang je er zelf nog niets zette
     const veld = $('#b-min');
     if (!bewerkId && (!veld.value || veld.value === '0' || veld.dataset.auto === '1')) {
-      const regel = regelVoor($('#b-merk').value, $('#b-naam').value);
+      const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
       veld.value = regel ? regel.min : 0;
       veld.dataset.auto = '1';
     }
@@ -3622,8 +3665,18 @@ function bindInstellingen() {
 function tekenRegels() {
   const el = $('#regel-lijst');
   if (!el) return;
-  el.innerHTML = MINIMUMREGELS.map(r =>
-    `<div class="regelrij"><span>${ontsnap(r.label)}</span><b>${r.min}</b></div>`).join('');
+  el.innerHTML = Store.regels().map(r => `
+    <div class="regelrij">
+      <span>${ontsnap(r.label)}</span>
+      <input type="number" inputmode="numeric" min="0" value="${r.min}" data-regel="${r.key}" aria-label="Minimum voor ${ontsnap(r.label)}">
+    </div>`).join('');
+
+  el.onchange = async e => {
+    const key = e.target.dataset.regel;
+    if (!key) return;
+    const n = await Store.zetMinimum(key, e.target.value);
+    melding(n ? `Aangepast · ${n} product${n === 1 ? '' : 'en'} volgen mee.` : 'Aangepast.');
+  };
 }
 
 function tekenOpslag() {
@@ -3647,18 +3700,12 @@ function tekenLeveranciers() {
       <select data-lev-cat="${ontsnap(l.naam)}">
         ${HOOFDCATEGORIEEN.map(c => `<option value="${c.key}"${c.key === l.cat ? ' selected' : ''}>${c.label}</option>`).join('')}
       </select>
-      <select data-lev-formaat="${ontsnap(l.naam)}" class="beheerrij__formaat">
-        <option value="cebeo"${l.formaat === 'cebeo' ? ' selected' : ''}>Kaartjes (Cebeo-app)</option>
-        <option value="tabel"${l.formaat !== 'cebeo' ? ' selected' : ''}>Tabel</option>
-      </select>
       <button class="beheerrij__weg" data-lev-weg="${ontsnap(l.naam)}" title="${n ? n + ' product(en) — eerst verplaatsen' : 'Verwijderen'}"${n ? ' data-vast="1"' : ''}>×</button>
       <small>${n ? n + (n === 1 ? ' product' : ' producten') : 'nog niet gebruikt'}</small>
     </div>`;
   }).join('') || '<div class="veld__hulp">Nog geen leveranciers.</div>';
 
   el.onchange = async e => {
-    const fmt = e.target.dataset.levFormaat;
-    if (fmt) { await Store.zetLeverancierFormaat(fmt, e.target.value); melding('Soort orderlijst aangepast.'); return; }
     const cat = e.target.dataset.levCat;
     if (cat) { await Store.zetLeverancierCat(cat, e.target.value); melding('Standaardcategorie aangepast.'); return; }
     const oud = e.target.dataset.levNaam;

@@ -11,7 +11,9 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Foto vergroten** — tik op de productfoto in het productscherm
 - **Dubbels vermijden** — typ je een naam die lijkt op iets wat je al hebt, dan toont de app die producten en vraagt ze of je wil bijtellen
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
-- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen
+- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen. Je hoeft niets in te stellen
+- **Bulk verwijderen** — selectiestand in de voorraadlijst; "Alles" werkt op wat er na je filters overblijft
+- **Minimums aanpasbaar** — de aantallen per soort staan bij Instellingen en zijn te wijzigen; producten die op die regel draaien volgen meteen mee
 - **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
 - **Eigen materiaal** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
 - **Eenheden** — stuk, m, m², zak, pallet, rol, kg, doos, liter
@@ -150,9 +152,13 @@ Opgeslagen gegevens van een oudere versie worden automatisch bijgewerkt (`migree
 
 ### Minimumregels
 
-`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld; "Regels opnieuw toepassen" bij Instellingen laat de zelf ingestelde met rust, tenzij je uitdrukkelijk anders kiest.
+`MINIMUMREGELS` in `store.js` bepaalt per soort product wanneer er bijbesteld moet worden. De standaardaantallen staan daar; wijzigt de gebruiker er één, dan komt dat in `staat.minima` onder de sleutel van de regel — de code blijft dus de bron van de regels, de gebruiker die van de aantallen. De eerste regel die past wint, dus het meest specifieke staat bovenaan (`Differentieel 300mA` vóór `Differentieel 30mA`). Een product onthoudt in `minAuto` of het minimum van een regel komt of zelf is ingesteld; "Regels opnieuw toepassen" bij Instellingen laat de zelf ingestelde met rust, tenzij je uitdrukkelijk anders kiest.
 
-Nieuwe soorten toevoegen: één regel bij in de lijst, `DATAVERSIE` verhogen en in `migreer()` de regels opnieuw laten lopen.
+Nieuwe soorten toevoegen: één regel bij in de lijst (met een eigen `key`), `DATAVERSIE` verhogen en in `migreer()` de regels opnieuw laten lopen.
+
+### Verwijderen en synchroniseren
+
+Verwijderde producten laten een spoor na in `staat.verwijderd` (id, refKey, tijdstip). Zonder dat spoor zet het andere toestel bij de volgende synchronisatie zijn eigen lijst terug en staat alles er weer. `samenvoegen()` gooit daarom producten weg waarvan het spoor jonger is dan de versie die binnenkomt. Sporen worden een half jaar bewaard.
 
 ## Volgende stappen
 

@@ -400,7 +400,7 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 /* bewerkbare lijstjes bij Instellingen */
 .beheerrij {
   display: grid;
-  grid-template-columns: 1fr 34% 30px;
+  grid-template-columns: 1fr 40% 30px;
   gap: 8px;
   align-items: center;
   padding: 9px 0;
@@ -425,7 +425,6 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 }
 .beheerrij__weg:active { background: var(--grijs-100); }
 .beheerrij__weg[data-vast] { color: var(--grijs-200); }
-.beheerrij__formaat { grid-column: 1 / 3; font-size: .78rem !important; }
 .beheerrij small {
   grid-column: 1 / -1;
   font-size: .68rem; color: var(--grijs-400);
@@ -685,6 +684,17 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
   font-size: .84rem;
 }
 .regelrij b { font-variant-numeric: tabular-nums; }
+.regelrij input {
+  width: 68px; flex: none;
+  text-align: center; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 4px;
+  border: 1.5px solid var(--grijs-200);
+  border-radius: 8px;
+  background: var(--grijs-50);
+  outline: none;
+}
+.regelrij input:focus { border-color: var(--rood); background: var(--wit); }
 
 /* ---------- Toast ------------------------------------------ */
 

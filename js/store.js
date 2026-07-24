@@ -10,8 +10,8 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.6.0';
-const DATAVERSIE = 5;
+export const VERSIE = '1.7.0';
+const DATAVERSIE = 6;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
@@ -33,25 +33,22 @@ export const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos
 ------------------------------------------------------------ */
 
 export const MINIMUMREGELS = [
-  { label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
-  { label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
-  { label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
-  { label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
-  { label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
-  { label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
-  { label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
-  { label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
-  { label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
-  { label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
-  { label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
-  { label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
+  { key: 'diff300',     label: 'Differentieel 300mA', min: 5,  test: t => /differentie/.test(t) && /300\s*ma/.test(t) },
+  { key: 'diff30',      label: 'Differentieel 30mA',  min: 10, test: t => /differentie/.test(t) && /(^|[^0])30\s*ma/.test(t) },
+  { key: 'hydrodoos',   label: 'Hydro opbouwdoos',    min: 10, test: t => /hydro/.test(t) && /opbouwdoos/.test(t) },
+  { key: 'inbouwdoos',  label: 'Inbouwdoos',          min: 10, test: t => /inbouwdoos/.test(t) },
+  { key: 'automaat',    label: 'Automaat',            min: 15, test: t => /automaat/.test(t) },
+  { key: 'afdekplaat',  label: 'Afdekplaat',          min: 25, test: t => /afdekplaat/.test(t) },
+  { key: 'stopcontact', label: 'Stopcontact',         min: 10, test: t => /stopcontact/.test(t) },
+  { key: 'toets',       label: 'Toets',               min: 20, test: t => /\btoets/.test(t) },
+  { key: 'kabelgoot',   label: 'Kabelgoot',           min: 5,  test: t => /kabelgoot/.test(t) },
+  { key: 'infrarood',   label: 'Infrarood',           min: 2,  test: t => /infrarood/.test(t) },
+  { key: 'dimmer',      label: 'Dimmermodule',        min: 2,  test: t => /dimmermodule/.test(t) },
+  { key: 'verdeelkast', label: 'Verdeelkast',         min: 2,  test: t => /verdeelkast/.test(t) }
 ];
 
-/**
- * Zoekt het afgesproken minimum bij een productnaam.
- * @returns {{min:number, label:string}|null}
- */
-export function regelVoor(...delen) {
+/** Welke regel past bij deze productnaam? (zonder eigen aantallen) */
+function zoekRegel(...delen) {
   const t = delen.filter(Boolean).join(' ').toLowerCase();
   return MINIMUMREGELS.find(r => r.test(t)) || null;
 }
@@ -175,6 +172,7 @@ function legeStaat() {
       { naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' }
     ],
     orders: [],
+    minima: {},          // eigen aantallen per minimumregel
     // Verwijderde producten laten een spoor na. Zonder dat spoor komt een
     // product dat je hier wist gewoon terug zodra een ander toestel zijn
     // versie naar de cloud stuurt.
@@ -206,14 +204,19 @@ function migreer(staat) {
   if (!Array.isArray(staat.verwijderd)) staat.verwijderd = [];
   if (staat.versie < 4) {
     staat.producten.forEach(p => {
-      const regel = regelVoor(p.brand, p.name);
-      if (regel) { p.min = regel.min; p.minAuto = true; }
+      const regel = zoekRegel(p.brand, p.name);
+      if (regel) { p.min = staat.minima?.[regel.key] ?? regel.min; p.minAuto = true; }
     });
     staat.versie = 4;
   }
+  if (!staat.minima) staat.minima = {};
   if (staat.versie < 5) {
     staat.verwijderd = staat.verwijderd || [];
     staat.versie = 5;
+  }
+  if (staat.versie < 6) {
+    staat.minima = staat.minima || {};
+    staat.versie = 6;
   }
   return staat;
 }
@@ -247,7 +250,7 @@ export const Store = {
       const seed = window.__SEED__ || await fetch(seedUrl).then(r => r.json());
       const nu = new Date().toISOString();
       seed.products.forEach(p => {
-        const regel = regelVoor(p.brand, p.name);
+        const regel = this.regelVoor(p.brand, p.name);
         this.staat.producten.push({
           id: id(),
           ref: p.ref,
@@ -337,7 +340,7 @@ export const Store = {
   async voegProductToe(data) {
     const leverancier = data.leverancier || '';
     const ref = data.ref || this.eigenRef(leverancier);
-    const regel = regelVoor(data.brand, data.name);
+    const regel = this.regelVoor(data.brand, data.name);
     const p = {
       id: id(),
       ref,
@@ -492,12 +495,41 @@ export const Store = {
     return { bij, nieuw, order };
   },
 
+  /** De regels zoals ze nu gelden, met de aantallen die jij hebt ingesteld. */
+  regels() {
+    return MINIMUMREGELS.map(r => ({ ...r, min: this.staat.minima?.[r.key] ?? r.min }));
+  },
+
+  /** Het afgesproken minimum bij een productnaam. */
+  regelVoor(...delen) {
+    const r = zoekRegel(...delen);
+    return r ? { ...r, min: this.staat.minima?.[r.key] ?? r.min } : null;
+  },
+
+  /** Een minimum aanpassen; producten die op die regel draaien volgen mee. */
+  async zetMinimum(key, waarde) {
+    const regel = MINIMUMREGELS.find(r => r.key === key);
+    if (!regel) return 0;
+    const n = Math.max(0, parseInt(waarde, 10) || 0);
+    this.staat.minima = this.staat.minima || {};
+    if (n === regel.min) delete this.staat.minima[key];
+    else this.staat.minima[key] = n;
+
+    let bij = 0;
+    this.staat.producten.forEach(p => {
+      if (p.minAuto === false) return;
+      if (zoekRegel(p.brand, p.name)?.key === key && p.min !== n) { p.min = n; p.minAuto = true; bij++; }
+    });
+    await this.bewaar();
+    return bij;
+  },
+
   /** Past de minimumregels opnieuw toe. Zelf ingestelde minimums blijven. */
   async pasRegelsToe({ ookHandmatig = false } = {}) {
     let n = 0;
     this.staat.producten.forEach(p => {
       if (!ookHandmatig && p.minAuto === false) return;
-      const regel = regelVoor(p.brand, p.name);
+      const regel = this.regelVoor(p.brand, p.name);
       if (regel && p.min !== regel.min) { p.min = regel.min; p.minAuto = true; n++; }
     });
     if (n) await this.bewaar();
@@ -672,6 +704,7 @@ export const Store = {
         this.staat.leveranciers.push(l);
       }
     });
+    if (ander.minima) this.staat.minima = { ...ander.minima, ...this.staat.minima };
     (ander.orders || []).forEach(o => {
       if (!this.staat.orders.some(x => x.id === o.id)) this.staat.orders.push(o);
     });

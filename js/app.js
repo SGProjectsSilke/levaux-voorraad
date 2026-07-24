@@ -2,7 +2,7 @@
    app.js — schermen en interactie
    =========================================================== */
 
-import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat, MINIMUMREGELS, regelVoor } from './store.js';
+import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat, MINIMUMREGELS } from './store.js';
 import { leesAfbeeldingen, herlees, parseer, parseerKaarten, parseerTabel, haalFotos, haalOrdernummer, raadLeverancier } from './ocr.js';
 import { Cloud } from './cloud.js';
 
@@ -492,7 +492,7 @@ function bindBewerkModal() {
     // het afgesproken minimum meteen invullen, zolang je er zelf nog niets zette
     const veld = $('#b-min');
     if (!bewerkId && (!veld.value || veld.value === '0' || veld.dataset.auto === '1')) {
-      const regel = regelVoor($('#b-merk').value, $('#b-naam').value);
+      const regel = Store.regelVoor($('#b-merk').value, $('#b-naam').value);
       veld.value = regel ? regel.min : 0;
       veld.dataset.auto = '1';
     }
@@ -1052,8 +1052,18 @@ function bindInstellingen() {
 function tekenRegels() {
   const el = $('#regel-lijst');
   if (!el) return;
-  el.innerHTML = MINIMUMREGELS.map(r =>
-    `<div class="regelrij"><span>${ontsnap(r.label)}</span><b>${r.min}</b></div>`).join('');
+  el.innerHTML = Store.regels().map(r => `
+    <div class="regelrij">
+      <span>${ontsnap(r.label)}</span>
+      <input type="number" inputmode="numeric" min="0" value="${r.min}" data-regel="${r.key}" aria-label="Minimum voor ${ontsnap(r.label)}">
+    </div>`).join('');
+
+  el.onchange = async e => {
+    const key = e.target.dataset.regel;
+    if (!key) return;
+    const n = await Store.zetMinimum(key, e.target.value);
+    melding(n ? `Aangepast · ${n} product${n === 1 ? '' : 'en'} volgen mee.` : 'Aangepast.');
+  };
 }
 
 function tekenOpslag() {
@@ -1077,18 +1087,12 @@ function tekenLeveranciers() {
       <select data-lev-cat="${ontsnap(l.naam)}">
         ${HOOFDCATEGORIEEN.map(c => `<option value="${c.key}"${c.key === l.cat ? ' selected' : ''}>${c.label}</option>`).join('')}
       </select>
-      <select data-lev-formaat="${ontsnap(l.naam)}" class="beheerrij__formaat">
-        <option value="cebeo"${l.formaat === 'cebeo' ? ' selected' : ''}>Kaartjes (Cebeo-app)</option>
-        <option value="tabel"${l.formaat !== 'cebeo' ? ' selected' : ''}>Tabel</option>
-      </select>
       <button class="beheerrij__weg" data-lev-weg="${ontsnap(l.naam)}" title="${n ? n + ' product(en) — eerst verplaatsen' : 'Verwijderen'}"${n ? ' data-vast="1"' : ''}>×</button>
       <small>${n ? n + (n === 1 ? ' product' : ' producten') : 'nog niet gebruikt'}</small>
     </div>`;
   }).join('') || '<div class="veld__hulp">Nog geen leveranciers.</div>';
 
   el.onchange = async e => {
-    const fmt = e.target.dataset.levFormaat;
-    if (fmt) { await Store.zetLeverancierFormaat(fmt, e.target.value); melding('Soort orderlijst aangepast.'); return; }
     const cat = e.target.dataset.levCat;
     if (cat) { await Store.zetLeverancierCat(cat, e.target.value); melding('Standaardcategorie aangepast.'); return; }
     const oud = e.target.dataset.levNaam;
