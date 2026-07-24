@@ -4,6 +4,7 @@
 
 import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat } from './store.js';
 import { leesAfbeeldingen, parseer, haalFotos, haalOrdernummer } from './ocr.js';
+import { Cloud } from './cloud.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -74,7 +75,17 @@ async function init() {
 
   Store.bijWijziging(tekenAlles);
   Store.bijFout(msg => melding(msg));
+  bindCloud();
   tekenAlles();
+
+  if (Cloud.ingesteld()) {
+    Store.bijWijziging(planSync);
+    if (await Cloud.herstel()) {
+      Store.gebruiker = Cloud.naam;
+      await haalCloudOp();
+    }
+    tekenCloud();
+  }
 
   // enkel zinvol op een echte website, niet in de demo-versie
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -98,10 +109,6 @@ function tekenAlles() {
 
 function bindNavigatie() {
   $$('#nav button').forEach(b => b.addEventListener('click', () => toon(b.dataset.scherm)));
-  $('#btn-snel-zoek').addEventListener('click', () => {
-    toon('voorraad');
-    $('#zoek').focus();
-  });
 }
 
 function toon(naam) {
@@ -266,6 +273,15 @@ function bindProductModal() {
     await Store.bewerkProduct(p.id, { min: n });
     tekenResultaat();
     melding(n ? `Bijbestellen vanaf ${n} ${p.eenheid || ''}`.trim() : 'Geen waarschuwing meer voor dit product.');
+  });
+
+  $('#m-kopieer-naam').addEventListener('click', () => {
+    const p = Store.viaId(ui.productId);
+    if (p) kopieer([p.brand, p.name].filter(Boolean).join(' '), 'Naam gekopieerd.');
+  });
+  $('#m-kopieer-ref').addEventListener('click', () => {
+    const p = Store.viaId(ui.productId);
+    if (p) kopieer(p.ref, 'Referentie gekopieerd.');
   });
 
   $('#m-bevestig').addEventListener('click', () => boek(-1));
@@ -565,17 +581,8 @@ async function bevestigImport() {
    =========================================================== */
 
 function bindBestellen() {
-  $('#btn-kopieer-bestel').addEventListener('click', async () => {
-    const t = bestelTekst();
-    if (!t) return melding('Niets bij te bestellen.');
-    try { await navigator.clipboard.writeText(t); melding('Lijst gekopieerd.'); }
-    catch { melding('Kopiëren lukt niet op dit toestel.'); }
-  });
-  $('#btn-mail-bestel').addEventListener('click', () => {
-    const t = bestelTekst();
-    if (!t) return melding('Niets bij te bestellen.');
-    location.href = `mailto:?subject=${encodeURIComponent('Bestelling Levaux Bouw')}&body=${encodeURIComponent(t)}`;
-  });
+  $('#btn-kopieer-bestel').addEventListener('click', () => kopieer(bestelTekst(), 'Lijst gekopieerd.'));
+  $('#btn-mail-bestel').addEventListener('click', () => toonMailKeuze());
 }
 
 /** Voorstel: aanvullen tot het dubbele van het minimum. */
@@ -591,17 +598,73 @@ function perLeverancier(lijst) {
   return [...groepen.entries()].sort((a, b) => a[0].localeCompare(b[0], 'nl'));
 }
 
-function bestelTekst() {
-  const lijst = Store.teBestellen();
+/**
+ * Leesbare bestellijst. Blijft leesbaar in een mail, waar tabs en
+ * uitlijning toch verloren gaan: één product per blokje van twee regels.
+ */
+function bestelTekst(alleenLeverancier = '') {
+  let lijst = Store.teBestellen();
+  if (alleenLeverancier) lijst = lijst.filter(p => (p.leverancier || '') === alleenLeverancier);
   if (!lijst.length) return '';
-  let t = 'Bestelling Levaux Bouw — ' + new Date().toLocaleDateString('nl-BE') + '\n';
+
+  const datum = new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+  let t = `BESTELLING — Levaux Bouw\n${datum}\n`;
+
   for (const [lev, producten] of perLeverancier(lijst)) {
-    t += `\n== ${lev} ==\n`;
-    t += producten.map(p =>
-      `${p.ref}\t${[p.brand, p.name].filter(Boolean).join(' - ')}\tnu ${p.qty} ${p.eenheid || ''} → bestel ${bestelAantal(p)}`
-    ).join('\n') + '\n';
+    t += `\n${'='.repeat(34)}\n${lev.toUpperCase()}  (${producten.length} ${producten.length === 1 ? 'product' : 'producten'})\n${'='.repeat(34)}\n\n`;
+    producten.forEach((p, i) => {
+      const eenheid = p.eenheid && p.eenheid !== 'stuk' ? ' ' + p.eenheid : ' stuk';
+      t += `${i + 1}. ${bestelAantal(p)}${eenheid} — ${[p.brand, p.name].filter(Boolean).join(' ')}\n`;
+      t += `   ref ${p.ref}   (nu ${p.qty}, minimum ${p.min})\n\n`;
+    });
   }
+  t += `${'-'.repeat(34)}\nOpgemaakt met de voorraadapp van Levaux Bouw.\n`;
   return t;
+}
+
+/** Eén mail per leverancier: die stuur je toch naar verschillende adressen. */
+function toonMailKeuze() {
+  const groepen = perLeverancier(Store.teBestellen());
+  if (!groepen.length) return melding('Niets bij te bestellen.');
+
+  const stuur = lev => {
+    const t = bestelTekst(lev === '__alle' ? '' : lev);
+    const onderwerp = lev === '__alle' ? 'Bestelling Levaux Bouw' : `Bestelling Levaux Bouw — ${lev}`;
+    location.href = `mailto:?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(t)}`;
+  };
+
+  if (groepen.length === 1) return stuur(groepen[0][0]);
+
+  const el = $('#mail-keuze');
+  el.innerHTML = groepen.map(([lev, p]) =>
+    `<button class="knop knop--leeg" data-lev="${ontsnap(lev)}">${ontsnap(lev)} · ${p.length}</button>`
+  ).join('') + '<button class="knop knop--zwart" data-lev="__alle">Alles in één mail</button>';
+  el.onclick = e => {
+    const lev = e.target.dataset.lev;
+    if (!lev) return;
+    $('#modal-mail').hidden = true;
+    stuur(lev);
+  };
+  $('#modal-mail').hidden = false;
+}
+
+async function kopieer(tekst, bevestiging) {
+  if (!tekst) return melding('Er valt niets te kopiëren.');
+  try {
+    await navigator.clipboard.writeText(tekst);
+    melding(bevestiging);
+  } catch {
+    // oudere browsers en pagina's zonder https
+    const t = document.createElement('textarea');
+    t.value = tekst;
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    try { document.execCommand('copy'); melding(bevestiging); }
+    catch { melding('Kopiëren lukt niet op dit toestel.'); }
+    t.remove();
+  }
 }
 
 function tekenBestellen() {
@@ -666,7 +729,7 @@ function tekenHistoriek() {
       <div class="log__delta ${m.delta < 0 ? 'log__delta--min' : 'log__delta--plus'}">${m.delta > 0 ? '+' : ''}${m.delta}</div>
       <div>
         <div class="log__naam">${ontsnap(m.naam)}</div>
-        <div class="log__meta">${ontsnap(m.reden)} · nog ${m.restant}</div>
+        <div class="log__meta">${ontsnap(m.reden)}${m.door ? ' · ' + ontsnap(m.door) : ''} · nog ${m.restant}</div>
       </div>
       <div class="log__tijd">${d.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}</div>`;
     el.appendChild(div);
@@ -785,6 +848,152 @@ function tekenLeveranciers() {
     await Store.verwijderLeverancier(naam);
     melding('Leverancier verwijderd.');
   };
+}
+
+/* ===========================================================
+   Cloud
+   =========================================================== */
+
+let syncTimer = null;
+let syncBezig = false;
+
+/** Na elke wijziging: even wachten en dan één keer wegschrijven. */
+function planSync() {
+  if (!Cloud.aangemeld() || !Cloud.team) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(duwNaarCloud, 2500);
+}
+
+async function duwNaarCloud() {
+  if (!Cloud.aangemeld() || !Cloud.team || syncBezig) return;
+  syncBezig = true;
+  try {
+    await Cloud.bewaar(Store.staat);
+    tekenCloud();
+  } catch (e) {
+    melding('Cloud: ' + e.message);
+  } finally {
+    syncBezig = false;
+  }
+}
+
+async function haalCloudOp() {
+  try {
+    const ver = await Cloud.haalOp();
+    if (ver?.data) {
+      const veranderd = Store.samenvoegen(ver.data);
+      if (veranderd) await Store.bewaar();
+    } else {
+      await Cloud.bewaar(Store.staat);      // eerste keer: wat hier staat wordt de basis
+    }
+    tekenCloud();
+  } catch (e) {
+    melding('Cloud: ' + e.message);
+  }
+}
+
+function bindCloud() {
+  $('#log-annuleer').addEventListener('click', () => { $('#modal-login').hidden = true; });
+  $('#team-annuleer').addEventListener('click', () => { $('#modal-team').hidden = true; });
+
+  $('#log-aanmelden').addEventListener('click', async () => {
+    const email = $('#log-email').value.trim();
+    const ww = $('#log-ww').value;
+    if (!email || !ww) return melding('Vul je e-mailadres en wachtwoord in.');
+    try {
+      await Cloud.meldAan(email, ww);
+      $('#log-ww').value = '';
+      $('#modal-login').hidden = true;
+      Store.gebruiker = Cloud.naam;
+      if (!Cloud.team) {
+        $('#team-naam').value = Cloud.naam || '';
+        $('#modal-team').hidden = false;
+      } else {
+        await haalCloudOp();
+        melding('Aangemeld als ' + Cloud.naam);
+      }
+      tekenCloud();
+    } catch (e) { melding(e.message); }
+  });
+
+  $('#team-nieuw').addEventListener('click', async () => {
+    try {
+      await Cloud.maakTeam('Levaux Bouw', $('#team-naam').value.trim());
+      Store.gebruiker = Cloud.naam;
+      $('#modal-team').hidden = true;
+      await haalCloudOp();
+      melding('Gedeelde voorraad aangemaakt.');
+    } catch (e) { melding(e.message); }
+  });
+
+  $('#team-aansluiten').addEventListener('click', async () => {
+    try {
+      await Cloud.sluitAan($('#team-code').value, $('#team-naam').value.trim());
+      Store.gebruiker = Cloud.naam;
+      $('#modal-team').hidden = true;
+      await haalCloudOp();
+      melding('Aangesloten bij de gedeelde voorraad.');
+    } catch (e) { melding(e.message); }
+  });
+}
+
+function tekenCloud() {
+  const paneel = $('#paneel-cloud');
+  if (!paneel) return;
+  paneel.hidden = !Cloud.ingesteld();
+  if (!Cloud.ingesteld()) return;
+
+  const status = $('#cloud-status');
+  const knoppen = $('#cloud-knoppen');
+  knoppen.innerHTML = '';
+
+  if (!Cloud.aangemeld()) {
+    $('#cloud-uitleg').textContent = 'Meld je aan om de voorraad te delen tussen toestellen en automatisch in de cloud te bewaren.';
+    status.innerHTML = '';
+    const b = document.createElement('button');
+    b.className = 'knop';
+    b.textContent = 'Aanmelden';
+    b.onclick = () => { $('#modal-login').hidden = false; };
+    knoppen.appendChild(b);
+    return;
+  }
+
+  $('#cloud-uitleg').textContent = 'De voorraad wordt automatisch bewaard in de cloud en gedeeld met je team.';
+  const sync = Cloud.laatsteSync
+    ? Cloud.laatsteSync.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })
+    : 'nog niet';
+  status.innerHTML = `
+    <table class="tabel-mini">
+      <tr><td>Aangemeld als</td><td>${ontsnap(Cloud.naam || Cloud.sessie.email)}</td></tr>
+      <tr><td>Team</td><td>${ontsnap(Cloud.team?.naam || '—')}</td></tr>
+      <tr><td>Laatst gesynchroniseerd</td><td>${sync}</td></tr>
+    </table>
+    ${Cloud.team ? `<div class="veld__hulp" style="margin-top:8px">Teamcode om iemand toe te voegen:<br><code style="font-size:.72rem;word-break:break-all">${ontsnap(Cloud.team.id)}</code></div>` : ''}`;
+
+  const nu = document.createElement('button');
+  nu.className = 'knop knop--zwart';
+  nu.textContent = 'Nu synchroniseren';
+  nu.onclick = async () => { await haalCloudOp(); await duwNaarCloud(); melding('Gesynchroniseerd.'); };
+  knoppen.appendChild(nu);
+
+  if (Cloud.team) {
+    const code = document.createElement('button');
+    code.className = 'knop knop--leeg';
+    code.textContent = 'Teamcode kopiëren';
+    code.onclick = () => kopieer(Cloud.team.id, 'Teamcode gekopieerd.');
+    knoppen.appendChild(code);
+  }
+
+  const af = document.createElement('button');
+  af.className = 'knop knop--leeg';
+  af.textContent = 'Afmelden';
+  af.onclick = async () => {
+    await Cloud.meldAf();
+    Store.gebruiker = '';
+    tekenCloud();
+    melding('Afgemeld. De voorraad blijft op dit toestel staan.');
+  };
+  knoppen.appendChild(af);
 }
 
 /* ===========================================================

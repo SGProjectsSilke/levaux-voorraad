@@ -412,6 +412,16 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 .modal__titel h2 { margin: 0; font-size: 1rem; line-height: 1.35; }
 .modal__titel .kaart__merk { margin-bottom: 2px; }
 
+.kopieer { display: flex; gap: 6px; margin-top: 7px; }
+.kopieer button {
+  font-size: .72rem; font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--grijs-100);
+  color: var(--grijs-900);
+}
+.kopieer button:active { background: var(--grijs-200); }
+
 /* teller */
 .teller { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 6px 0 14px; }
 .teller button {

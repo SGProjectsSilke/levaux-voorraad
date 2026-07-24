@@ -24,9 +24,6 @@
       <strong>Levaux Bouw</strong>
       <span id="header-sub">Voorraad werkbus</span>
     </div>
-    <div class="app-header__acties">
-      <button class="icoonknop" id="btn-snel-zoek" title="Zoeken" aria-label="Zoeken">&#128269;</button>
-    </div>
   </div>
 
   <div class="zoekbalk" id="zoekbalk">
@@ -55,8 +52,8 @@
   <!-- ============ INBOEKEN ============ -->
   <section class="scherm" id="scherm-inboeken" hidden>
     <div class="paneel">
-      <h3>Order inlezen</h3>
-      <p>Maak schermafbeeldingen van je order en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe worden toegevoegd.</p>
+      <h3>Bestelbon inlezen</h3>
+      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
       <div class="veld">
         <label for="import-lev">Van welke leverancier?</label>
         <select id="import-lev"></select>
@@ -75,17 +72,17 @@
     </div>
 
     <div class="paneel">
-      <h3>Tekst plakken</h3>
-      <p>Werkt de foto niet goed? Plak de orderlijst als tekst — de app haalt er de referenties, aantallen en prijzen uit.</p>
+      <h3>Of: tekst plakken</h3>
+      <p>Lukt het inlezen van de afbeelding niet? Plak de orderlijst als tekst — de app haalt er de referenties, aantallen en prijzen uit.</p>
       <div class="veld">
-        <textarea id="plak-tekst" placeholder="NIKO - Enkelvoudige afdekplaat, wit  x 70  € 1,31&#10;Ref Cebeo 101-76100&#10;…"></textarea>
+        <textarea id="plak-tekst" placeholder="Plak hier de regels van je bestelbon…"></textarea>
       </div>
       <button class="knop knop--zwart" id="btn-plak">Tekst uitlezen</button>
     </div>
 
     <div class="paneel">
-      <h3>Eigen materiaal toevoegen</h3>
-      <p>Blokken, isolatie, buizen, een sanitairstuk — alles wat niet van Cebeo komt. Foto trekken, naam invullen, klaar. De rest mag je leeg laten.</p>
+      <h3>Handmatig inboeken</h3>
+      <p>Eén product erbij: blokken, isolatie, buizen, een sanitairstuk. Foto trekken, naam invullen, klaar — de rest mag je leeg laten.</p>
       <button class="knop knop--zwart" id="btn-nieuw-foto">Foto nemen en toevoegen</button>
       <button class="knop knop--leeg" id="btn-nieuw-product" style="margin-top:9px">Zonder foto toevoegen</button>
     </div>
@@ -126,6 +123,13 @@
 
   <!-- ============ INSTELLINGEN ============ -->
   <section class="scherm" id="scherm-instellingen" hidden>
+    <div class="paneel" id="paneel-cloud" hidden>
+      <h3>Cloud</h3>
+      <p id="cloud-uitleg">De voorraad staat enkel op dit toestel.</p>
+      <div id="cloud-status"></div>
+      <div class="knoppen" id="cloud-knoppen"></div>
+    </div>
+
     <div class="paneel">
       <h3>Leveranciers</h3>
       <p>Bij elke leverancier hoort een standaardcategorie en het soort orderlijst. <strong>Kaartjes</strong> is de Cebeo-app; <strong>tabel</strong> is een lijst met artikelnummer, aantal en prijs naast elkaar.</p>
@@ -202,6 +206,10 @@
         <div class="kaart__merk" id="m-merk"></div>
         <h2 id="m-naam"></h2>
         <div class="kaart__ref" id="m-ref"></div>
+        <div class="kopieer">
+          <button id="m-kopieer-naam" type="button">Naam kopiëren</button>
+          <button id="m-kopieer-ref" type="button">Referentie</button>
+        </div>
       </div>
     </div>
 
@@ -274,8 +282,63 @@
   </div>
 </div>
 
+<!-- ============ MODAL: naar wie mailen ============ -->
+<div class="modal" id="modal-mail" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 6px;font-size:1.05rem">Naar welke leverancier?</h2>
+    <p style="margin:0 0 14px;font-size:.85rem;color:var(--grijs-600)">Je bestelt bij elke leverancier apart, dus maakt de app één mail per leverancier.</p>
+    <div class="knoppen" id="mail-keuze"></div>
+    <button class="knop knop--leeg" style="margin-top:9px" onclick="document.getElementById('modal-mail').hidden=true">Annuleren</button>
+  </div>
+</div>
+
+<!-- ============ MODAL: aanmelden ============ -->
+<div class="modal" id="modal-login" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 4px;font-size:1.05rem">Aanmelden</h2>
+    <p style="margin:0 0 16px;font-size:.85rem;color:var(--grijs-600)">Meld je aan om de voorraad te delen tussen toestellen.</p>
+
+    <div class="veld"><label for="log-email">E-mailadres</label>
+      <input type="email" id="log-email" autocomplete="username" inputmode="email" placeholder="naam@voorbeeld.be"></div>
+    <div class="veld"><label for="log-ww">Wachtwoord</label>
+      <input type="password" id="log-ww" autocomplete="current-password"></div>
+
+    <div class="knoppen">
+      <button class="knop" id="log-aanmelden">Aanmelden</button>
+      <button class="knop knop--leeg" id="log-annuleer">Annuleren</button>
+    </div>
+    <p class="veld__hulp" style="margin-top:12px">Nog geen account? Die maakt Silke aan in Supabase.</p>
+  </div>
+</div>
+
+<!-- ============ MODAL: team kiezen ============ -->
+<div class="modal" id="modal-team" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 4px;font-size:1.05rem">Nog geen gedeelde voorraad</h2>
+    <p style="margin:0 0 16px;font-size:.85rem;color:var(--grijs-600)">Begin een nieuwe gedeelde voorraad, of sluit aan bij een bestaande met de teamcode.</p>
+
+    <div class="veld"><label for="team-naam">Jouw naam</label>
+      <input type="text" id="team-naam" placeholder="Cédric"></div>
+
+    <div class="knoppen">
+      <button class="knop" id="team-nieuw">Nieuwe gedeelde voorraad beginnen</button>
+    </div>
+
+    <div class="veld" style="margin-top:18px"><label for="team-code">Of: teamcode van een bestaande voorraad</label>
+      <input type="text" id="team-code" placeholder="00000000-0000-0000-0000-000000000000"></div>
+    <div class="knoppen">
+      <button class="knop knop--zwart" id="team-aansluiten">Aansluiten</button>
+      <button class="knop knop--leeg" id="team-annuleer">Later</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
+<script src="config.js"></script>
 <script src="js/app.js" type="module"></script>
 </body>
 </html>

@@ -425,6 +425,16 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 .modal__titel h2 { margin: 0; font-size: 1rem; line-height: 1.35; }
 .modal__titel .kaart__merk { margin-bottom: 2px; }
 
+.kopieer { display: flex; gap: 6px; margin-top: 7px; }
+.kopieer button {
+  font-size: .72rem; font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--grijs-100);
+  color: var(--grijs-900);
+}
+.kopieer button:active { background: var(--grijs-200); }
+
 /* teller */
 .teller { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 6px 0 14px; }
 .teller button {
@@ -607,9 +617,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <strong>Levaux Bouw</strong>
       <span id="header-sub">Voorraad werkbus</span>
     </div>
-    <div class="app-header__acties">
-      <button class="icoonknop" id="btn-snel-zoek" title="Zoeken" aria-label="Zoeken">&#128269;</button>
-    </div>
   </div>
 
   <div class="zoekbalk" id="zoekbalk">
@@ -638,8 +645,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   <!-- ============ INBOEKEN ============ -->
   <section class="scherm" id="scherm-inboeken" hidden>
     <div class="paneel">
-      <h3>Order inlezen</h3>
-      <p>Maak schermafbeeldingen van je order en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe worden toegevoegd.</p>
+      <h3>Bestelbon inlezen</h3>
+      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
       <div class="veld">
         <label for="import-lev">Van welke leverancier?</label>
         <select id="import-lev"></select>
@@ -658,17 +665,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <div class="paneel">
-      <h3>Tekst plakken</h3>
-      <p>Werkt de foto niet goed? Plak de orderlijst als tekst — de app haalt er de referenties, aantallen en prijzen uit.</p>
+      <h3>Of: tekst plakken</h3>
+      <p>Lukt het inlezen van de afbeelding niet? Plak de orderlijst als tekst — de app haalt er de referenties, aantallen en prijzen uit.</p>
       <div class="veld">
-        <textarea id="plak-tekst" placeholder="NIKO - Enkelvoudige afdekplaat, wit  x 70  € 1,31&#10;Ref Cebeo 101-76100&#10;…"></textarea>
+        <textarea id="plak-tekst" placeholder="Plak hier de regels van je bestelbon…"></textarea>
       </div>
       <button class="knop knop--zwart" id="btn-plak">Tekst uitlezen</button>
     </div>
 
     <div class="paneel">
-      <h3>Eigen materiaal toevoegen</h3>
-      <p>Blokken, isolatie, buizen, een sanitairstuk — alles wat niet van Cebeo komt. Foto trekken, naam invullen, klaar. De rest mag je leeg laten.</p>
+      <h3>Handmatig inboeken</h3>
+      <p>Eén product erbij: blokken, isolatie, buizen, een sanitairstuk. Foto trekken, naam invullen, klaar — de rest mag je leeg laten.</p>
       <button class="knop knop--zwart" id="btn-nieuw-foto">Foto nemen en toevoegen</button>
       <button class="knop knop--leeg" id="btn-nieuw-product" style="margin-top:9px">Zonder foto toevoegen</button>
     </div>
@@ -709,6 +716,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 
   <!-- ============ INSTELLINGEN ============ -->
   <section class="scherm" id="scherm-instellingen" hidden>
+    <div class="paneel" id="paneel-cloud" hidden>
+      <h3>Cloud</h3>
+      <p id="cloud-uitleg">De voorraad staat enkel op dit toestel.</p>
+      <div id="cloud-status"></div>
+      <div class="knoppen" id="cloud-knoppen"></div>
+    </div>
+
     <div class="paneel">
       <h3>Leveranciers</h3>
       <p>Bij elke leverancier hoort een standaardcategorie en het soort orderlijst. <strong>Kaartjes</strong> is de Cebeo-app; <strong>tabel</strong> is een lijst met artikelnummer, aantal en prijs naast elkaar.</p>
@@ -785,6 +799,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         <div class="kaart__merk" id="m-merk"></div>
         <h2 id="m-naam"></h2>
         <div class="kaart__ref" id="m-ref"></div>
+        <div class="kopieer">
+          <button id="m-kopieer-naam" type="button">Naam kopiëren</button>
+          <button id="m-kopieer-ref" type="button">Referentie</button>
+        </div>
       </div>
     </div>
 
@@ -857,6 +875,60 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   </div>
 </div>
 
+<!-- ============ MODAL: naar wie mailen ============ -->
+<div class="modal" id="modal-mail" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 6px;font-size:1.05rem">Naar welke leverancier?</h2>
+    <p style="margin:0 0 14px;font-size:.85rem;color:var(--grijs-600)">Je bestelt bij elke leverancier apart, dus maakt de app één mail per leverancier.</p>
+    <div class="knoppen" id="mail-keuze"></div>
+    <button class="knop knop--leeg" style="margin-top:9px" onclick="document.getElementById('modal-mail').hidden=true">Annuleren</button>
+  </div>
+</div>
+
+<!-- ============ MODAL: aanmelden ============ -->
+<div class="modal" id="modal-login" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 4px;font-size:1.05rem">Aanmelden</h2>
+    <p style="margin:0 0 16px;font-size:.85rem;color:var(--grijs-600)">Meld je aan om de voorraad te delen tussen toestellen.</p>
+
+    <div class="veld"><label for="log-email">E-mailadres</label>
+      <input type="email" id="log-email" autocomplete="username" inputmode="email" placeholder="naam@voorbeeld.be"></div>
+    <div class="veld"><label for="log-ww">Wachtwoord</label>
+      <input type="password" id="log-ww" autocomplete="current-password"></div>
+
+    <div class="knoppen">
+      <button class="knop" id="log-aanmelden">Aanmelden</button>
+      <button class="knop knop--leeg" id="log-annuleer">Annuleren</button>
+    </div>
+    <p class="veld__hulp" style="margin-top:12px">Nog geen account? Die maakt Silke aan in Supabase.</p>
+  </div>
+</div>
+
+<!-- ============ MODAL: team kiezen ============ -->
+<div class="modal" id="modal-team" hidden>
+  <div class="modal__inhoud">
+    <div class="modal__greep"></div>
+    <h2 style="margin:0 0 4px;font-size:1.05rem">Nog geen gedeelde voorraad</h2>
+    <p style="margin:0 0 16px;font-size:.85rem;color:var(--grijs-600)">Begin een nieuwe gedeelde voorraad, of sluit aan bij een bestaande met de teamcode.</p>
+
+    <div class="veld"><label for="team-naam">Jouw naam</label>
+      <input type="text" id="team-naam" placeholder="Cédric"></div>
+
+    <div class="knoppen">
+      <button class="knop" id="team-nieuw">Nieuwe gedeelde voorraad beginnen</button>
+    </div>
+
+    <div class="veld" style="margin-top:18px"><label for="team-code">Of: teamcode van een bestaande voorraad</label>
+      <input type="text" id="team-code" placeholder="00000000-0000-0000-0000-000000000000"></div>
+    <div class="knoppen">
+      <button class="knop knop--zwart" id="team-aansluiten">Aansluiten</button>
+      <button class="knop knop--leeg" id="team-annuleer">Later</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script type="module">
@@ -900,6 +972,8 @@ window.__SEED__ = {
   ]
 };
 
+window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
+
 /* ===========================================================
    store.js — datalaag
    -----------------------------------------------------------
@@ -918,14 +992,14 @@ const DATAVERSIE = 3;
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 const HOOFDCATEGORIEEN = [
   { key: 'elektra',    label: 'Elektra' },
-  { key: 'sanitair',   label: 'Sanitair & chauffage' },
+  { key: 'sanitair',   label: 'Chauffage & Sanitair' },
   { key: 'ruwbouw',    label: 'Ruwbouw' },
-  { key: 'materialen', label: 'Materialen' }
+  { key: 'materialen', label: 'Gebruiksmaterialen' }
 ];
 
 const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'liter'];
 
-const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Materialen';
+const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Gebruiksmaterialen';
 
 /* ---------- Adapter: dit toestel (localStorage) ------------ */
 
@@ -1078,6 +1152,7 @@ function migreer(staat) {
 const Store = {
   adapter: kiesAdapter(),
   staat: legeStaat(),
+  gebruiker: '',            // naam van wie is aangemeld (voor de historiek)
   _luisteraars: new Set(),
 
   async init(seedUrl) {
@@ -1134,6 +1209,7 @@ const Store = {
   _foutmelders: new Set(),
 
   async bewaar() {
+    this.staat.gewijzigd = new Date().toISOString();
     try {
       await this.adapter.bewaren(this.staat);
     } catch (e) {
@@ -1248,6 +1324,7 @@ const Store = {
       delta,
       reden,
       note: extra.note || '',
+      door: this.gebruiker || '',
       orderId: extra.orderId || '',
       restant: p.qty
     });
@@ -1379,8 +1456,52 @@ const Store = {
     await this.bewaar();
   },
 
+  /* ---------- Samenvoegen met de cloud --------------------
+     Twee toestellen die tegelijk werken: per product wint de
+     laatst gewijzigde versie, en de historiek van beide kanten
+     wordt samengevoegd. Boekt iemand op hetzelfde moment op
+     een ander toestel iets af van hetzelfde product, dan kan
+     die ene afboeking verloren gaan — de historiek toont dat
+     wel. Voor één man met af en toe een tweede toestel is dat
+     ruim voldoende; wil je het waterdicht, dan moet elke
+     afboeking apart naar de server.
+  --------------------------------------------------------- */
+  samenvoegen(ander) {
+    if (!ander || !Array.isArray(ander.producten)) return false;
+    const nieuwer = (a, b) => new Date(a || 0) > new Date(b || 0);
+
+    const perId = new Map(this.staat.producten.map(p => [p.id, p]));
+    // ook op referentie matchen: hetzelfde product kan op twee
+    // toestellen apart zijn aangemaakt
+    const perRef = new Map(this.staat.producten.filter(p => p.refKey).map(p => [p.refKey, p]));
+
+    ander.producten.forEach(rp => {
+      const mijn = perId.get(rp.id) || (rp.refKey && perRef.get(rp.refKey));
+      if (!mijn) {
+        this.staat.producten.push(rp);
+      } else if (nieuwer(rp.gewijzigd, mijn.gewijzigd)) {
+        Object.assign(mijn, rp, { id: mijn.id });
+      }
+    });
+
+    const gezien = new Set(this.staat.mutaties.map(m => m.id));
+    (ander.mutaties || []).forEach(m => { if (!gezien.has(m.id)) this.staat.mutaties.push(m); });
+    this.staat.mutaties.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+    if (this.staat.mutaties.length > 2000) this.staat.mutaties.length = 2000;
+
+    (ander.leveranciers || []).forEach(l => {
+      if (!this.staat.leveranciers.some(x => x.naam.toLowerCase() === l.naam.toLowerCase())) {
+        this.staat.leveranciers.push(l);
+      }
+    });
+    (ander.orders || []).forEach(o => {
+      if (!this.staat.orders.some(x => x.id === o.id)) this.staat.orders.push(o);
+    });
+    return true;
+  },
+
   exportCsv() {
-    const kop = ['Datum', 'Tijd', 'Beweging', 'Aantal', 'Eenheid', 'Merk + product', 'Referentie', 'Leverancier', 'Categorie', 'Restant', 'Opmerking'];
+    const kop = ['Datum', 'Tijd', 'Beweging', 'Aantal', 'Eenheid', 'Merk + product', 'Referentie', 'Leverancier', 'Categorie', 'Restant', 'Door', 'Opmerking'];
     const rijen = this.mutaties().map(m => {
       const d = new Date(m.ts);
       const p = this.viaId(m.productId);
@@ -1395,6 +1516,7 @@ const Store = {
         p?.leverancier || '',
         labelVanCat(p?.hoofdcat),
         m.restant,
+        m.door || '',
         m.note
       ];
     });
@@ -1425,6 +1547,212 @@ const Store = {
     return [...new Set(this.staat.producten.map(p => p.cat).filter(Boolean))].sort();
   }
 };
+
+
+/* ===========================================================
+   cloud.js — Supabase: aanmelden en synchroniseren
+   -----------------------------------------------------------
+   Werkt zonder de Supabase-bibliotheek: alles gaat via gewone
+   webverzoeken. Zo blijft de app één map met bestanden.
+
+   Zet je gegevens in config.js. Staat daar niets, dan draait
+   de app gewoon lokaal verder — de cloud is optioneel.
+
+   Opzet in Supabase (zie supabase/schema.sql):
+     teams     — één team = één gedeelde voorraad
+     leden     — wie hoort bij welk team, met zijn naam
+     voorraad  — de volledige voorraad als JSON, per team
+
+   De sleutel in config.js is de publieke "anon key". Die mág
+   in de app staan: de beveiliging zit in de regels (RLS) op de
+   tabellen, waardoor je enkel bij de voorraad van je eigen
+   team kan. Zonder aanmelden kom je er niet in.
+   =========================================================== */
+
+const cfg = () => (typeof window !== 'undefined' && window.LEVAUX_CONFIG) || {};
+const SESSIE = 'levaux.sessie.v1';
+
+const Cloud = {
+  sessie: null,          // { access_token, refresh_token, verlooptOp, gebruiker }
+  team: null,            // { id, naam }
+  naam: '',              // naam van de aangemelde persoon
+  laatsteSync: null,
+
+  /** Is de cloud ingesteld? Zo niet, dan blijft alles lokaal. */
+  ingesteld() {
+    const c = cfg();
+    return !!(c.supabaseUrl && c.supabaseKey);
+  },
+
+  aangemeld() { return !!this.sessie?.access_token; },
+
+  /* ---------- Verzoeken ------------------------------------ */
+
+  _url(pad) { return cfg().supabaseUrl.replace(/\/+$/, '') + pad; },
+
+  async _vraag(pad, opties = {}, metToken = true) {
+    const c = cfg();
+    const kop = {
+      apikey: c.supabaseKey,
+      'Content-Type': 'application/json',
+      ...(opties.headers || {})
+    };
+    if (metToken && this.sessie?.access_token) kop.Authorization = 'Bearer ' + this.sessie.access_token;
+
+    const roep = async () => {
+      try {
+        return await fetch(this._url(pad), { ...opties, headers: kop });
+      } catch {
+        throw new Error('Geen verbinding met de cloud. Werkt je internet?');
+      }
+    };
+
+    const r = await roep();
+    if (r.status === 401 && metToken && this.sessie?.refresh_token) {
+      await this.vernieuw();
+      kop.Authorization = 'Bearer ' + this.sessie.access_token;
+      return this._afhandelen(await roep());
+    }
+    return this._afhandelen(r);
+  },
+
+  async _afhandelen(r) {
+    const tekst = await r.text();
+    const data = tekst ? JSON.parse(tekst) : null;
+    if (!r.ok) {
+      const m = data?.msg || data?.message || data?.error_description || data?.error || 'Er ging iets mis (' + r.status + ')';
+      throw new Error(vertaal(m));
+    }
+    return data;
+  },
+
+  /* ---------- Aanmelden ------------------------------------ */
+
+  async meldAan(email, wachtwoord) {
+    const data = await this._vraag('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email: String(email).trim(), password: wachtwoord })
+    }, false);
+    this._bewaarSessie(data);
+    await this.zoekTeam();
+    return this.sessie;
+  },
+
+  async vernieuw() {
+    const data = await this._vraag('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: this.sessie.refresh_token })
+    }, false);
+    this._bewaarSessie(data);
+  },
+
+  async meldAf() {
+    try { await this._vraag('/auth/v1/logout', { method: 'POST' }); } catch { /* ook goed */ }
+    this.sessie = null;
+    this.team = null;
+    this.naam = '';
+    try { localStorage.removeItem(SESSIE); } catch {}
+  },
+
+  _bewaarSessie(data) {
+    this.sessie = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      verlooptOp: Date.now() + (data.expires_in || 3600) * 1000,
+      gebruiker: data.user?.id,
+      email: data.user?.email
+    };
+    try { localStorage.setItem(SESSIE, JSON.stringify(this.sessie)); } catch {}
+  },
+
+  /** Vorige sessie terughalen bij het opstarten van de app. */
+  async herstel() {
+    if (!this.ingesteld()) return false;
+    try {
+      const ruw = localStorage.getItem(SESSIE);
+      if (!ruw) return false;
+      this.sessie = JSON.parse(ruw);
+      if (this.sessie.verlooptOp < Date.now() + 60000) await this.vernieuw();
+      await this.zoekTeam();
+      return true;
+    } catch (e) {
+      console.warn('sessie niet hersteld:', e);
+      this.sessie = null;
+      return false;
+    }
+  },
+
+  /* ---------- Team ----------------------------------------- */
+
+  async zoekTeam() {
+    const leden = await this._vraag(`/rest/v1/leden?gebruiker=eq.${this.sessie.gebruiker}&select=team,naam,teams(naam)`);
+    if (leden?.length) {
+      this.team = { id: leden[0].team, naam: leden[0].teams?.naam || 'Levaux Bouw' };
+      this.naam = leden[0].naam || this.sessie.email;
+    } else {
+      this.team = null;
+    }
+    return this.team;
+  },
+
+  /** Eerste keer: een eigen team aanmaken. */
+  async maakTeam(teamnaam, mijnNaam) {
+    const teams = await this._vraag('/rest/v1/teams', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ naam: teamnaam || 'Levaux Bouw' })
+    });
+    const team = teams[0];
+    await this._vraag('/rest/v1/leden', {
+      method: 'POST',
+      body: JSON.stringify({ team: team.id, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
+    });
+    this.team = { id: team.id, naam: team.naam };
+    this.naam = mijnNaam || this.sessie.email;
+    return this.team;
+  },
+
+  /** Meedoen met een bestaand team via de teamcode. */
+  async sluitAan(teamcode, mijnNaam) {
+    const code = String(teamcode || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(code)) throw new Error('Dat is geen geldige teamcode.');
+    await this._vraag('/rest/v1/leden', {
+      method: 'POST',
+      body: JSON.stringify({ team: code, gebruiker: this.sessie.gebruiker, naam: mijnNaam || this.sessie.email })
+    });
+    return this.zoekTeam();
+  },
+
+  /* ---------- Voorraad ------------------------------------- */
+
+  async haalOp() {
+    if (!this.team) return null;
+    const rijen = await this._vraag(`/rest/v1/voorraad?team=eq.${this.team.id}&select=data,gewijzigd`);
+    this.laatsteSync = new Date();
+    return rijen?.length ? { data: rijen[0].data, gewijzigd: rijen[0].gewijzigd } : null;
+  },
+
+  async bewaar(staat) {
+    if (!this.team) return;
+    await this._vraag('/rest/v1/voorraad', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ team: this.team.id, data: staat, gewijzigd: new Date().toISOString() })
+    });
+    this.laatsteSync = new Date();
+  }
+};
+
+/** Supabase antwoordt in het Engels; de gebruiker leest Nederlands. */
+function vertaal(m) {
+  const t = String(m).toLowerCase();
+  if (t.includes('invalid login')) return 'E-mailadres of wachtwoord klopt niet.';
+  if (t.includes('email not confirmed')) return 'Dit e-mailadres is nog niet bevestigd. Kijk je mailbox na.';
+  if (t.includes('duplicate key')) return 'Je bent al lid van dit team.';
+  if (t.includes('violates row-level security')) return 'Geen toegang — klopt de teamcode?';
+  if (t.includes('failed to fetch')) return 'Geen verbinding met de cloud.';
+  return m;
+}
 
 
 /* ===========================================================
@@ -1829,6 +2157,7 @@ function knip(bron, box) {
    =========================================================== */
 
 
+
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -1898,7 +2227,17 @@ async function init() {
 
   Store.bijWijziging(tekenAlles);
   Store.bijFout(msg => melding(msg));
+  bindCloud();
   tekenAlles();
+
+  if (Cloud.ingesteld()) {
+    Store.bijWijziging(planSync);
+    if (await Cloud.herstel()) {
+      Store.gebruiker = Cloud.naam;
+      await haalCloudOp();
+    }
+    tekenCloud();
+  }
 
   // enkel zinvol op een echte website, niet in de demo-versie
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -1922,10 +2261,6 @@ function tekenAlles() {
 
 function bindNavigatie() {
   $$('#nav button').forEach(b => b.addEventListener('click', () => toon(b.dataset.scherm)));
-  $('#btn-snel-zoek').addEventListener('click', () => {
-    toon('voorraad');
-    $('#zoek').focus();
-  });
 }
 
 function toon(naam) {
@@ -2090,6 +2425,15 @@ function bindProductModal() {
     await Store.bewerkProduct(p.id, { min: n });
     tekenResultaat();
     melding(n ? `Bijbestellen vanaf ${n} ${p.eenheid || ''}`.trim() : 'Geen waarschuwing meer voor dit product.');
+  });
+
+  $('#m-kopieer-naam').addEventListener('click', () => {
+    const p = Store.viaId(ui.productId);
+    if (p) kopieer([p.brand, p.name].filter(Boolean).join(' '), 'Naam gekopieerd.');
+  });
+  $('#m-kopieer-ref').addEventListener('click', () => {
+    const p = Store.viaId(ui.productId);
+    if (p) kopieer(p.ref, 'Referentie gekopieerd.');
   });
 
   $('#m-bevestig').addEventListener('click', () => boek(-1));
@@ -2389,17 +2733,8 @@ async function bevestigImport() {
    =========================================================== */
 
 function bindBestellen() {
-  $('#btn-kopieer-bestel').addEventListener('click', async () => {
-    const t = bestelTekst();
-    if (!t) return melding('Niets bij te bestellen.');
-    try { await navigator.clipboard.writeText(t); melding('Lijst gekopieerd.'); }
-    catch { melding('Kopiëren lukt niet op dit toestel.'); }
-  });
-  $('#btn-mail-bestel').addEventListener('click', () => {
-    const t = bestelTekst();
-    if (!t) return melding('Niets bij te bestellen.');
-    location.href = `mailto:?subject=${encodeURIComponent('Bestelling Levaux Bouw')}&body=${encodeURIComponent(t)}`;
-  });
+  $('#btn-kopieer-bestel').addEventListener('click', () => kopieer(bestelTekst(), 'Lijst gekopieerd.'));
+  $('#btn-mail-bestel').addEventListener('click', () => toonMailKeuze());
 }
 
 /** Voorstel: aanvullen tot het dubbele van het minimum. */
@@ -2415,17 +2750,73 @@ function perLeverancier(lijst) {
   return [...groepen.entries()].sort((a, b) => a[0].localeCompare(b[0], 'nl'));
 }
 
-function bestelTekst() {
-  const lijst = Store.teBestellen();
+/**
+ * Leesbare bestellijst. Blijft leesbaar in een mail, waar tabs en
+ * uitlijning toch verloren gaan: één product per blokje van twee regels.
+ */
+function bestelTekst(alleenLeverancier = '') {
+  let lijst = Store.teBestellen();
+  if (alleenLeverancier) lijst = lijst.filter(p => (p.leverancier || '') === alleenLeverancier);
   if (!lijst.length) return '';
-  let t = 'Bestelling Levaux Bouw — ' + new Date().toLocaleDateString('nl-BE') + '\n';
+
+  const datum = new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+  let t = `BESTELLING — Levaux Bouw\n${datum}\n`;
+
   for (const [lev, producten] of perLeverancier(lijst)) {
-    t += `\n== ${lev} ==\n`;
-    t += producten.map(p =>
-      `${p.ref}\t${[p.brand, p.name].filter(Boolean).join(' - ')}\tnu ${p.qty} ${p.eenheid || ''} → bestel ${bestelAantal(p)}`
-    ).join('\n') + '\n';
+    t += `\n${'='.repeat(34)}\n${lev.toUpperCase()}  (${producten.length} ${producten.length === 1 ? 'product' : 'producten'})\n${'='.repeat(34)}\n\n`;
+    producten.forEach((p, i) => {
+      const eenheid = p.eenheid && p.eenheid !== 'stuk' ? ' ' + p.eenheid : ' stuk';
+      t += `${i + 1}. ${bestelAantal(p)}${eenheid} — ${[p.brand, p.name].filter(Boolean).join(' ')}\n`;
+      t += `   ref ${p.ref}   (nu ${p.qty}, minimum ${p.min})\n\n`;
+    });
   }
+  t += `${'-'.repeat(34)}\nOpgemaakt met de voorraadapp van Levaux Bouw.\n`;
   return t;
+}
+
+/** Eén mail per leverancier: die stuur je toch naar verschillende adressen. */
+function toonMailKeuze() {
+  const groepen = perLeverancier(Store.teBestellen());
+  if (!groepen.length) return melding('Niets bij te bestellen.');
+
+  const stuur = lev => {
+    const t = bestelTekst(lev === '__alle' ? '' : lev);
+    const onderwerp = lev === '__alle' ? 'Bestelling Levaux Bouw' : `Bestelling Levaux Bouw — ${lev}`;
+    location.href = `mailto:?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(t)}`;
+  };
+
+  if (groepen.length === 1) return stuur(groepen[0][0]);
+
+  const el = $('#mail-keuze');
+  el.innerHTML = groepen.map(([lev, p]) =>
+    `<button class="knop knop--leeg" data-lev="${ontsnap(lev)}">${ontsnap(lev)} · ${p.length}</button>`
+  ).join('') + '<button class="knop knop--zwart" data-lev="__alle">Alles in één mail</button>';
+  el.onclick = e => {
+    const lev = e.target.dataset.lev;
+    if (!lev) return;
+    $('#modal-mail').hidden = true;
+    stuur(lev);
+  };
+  $('#modal-mail').hidden = false;
+}
+
+async function kopieer(tekst, bevestiging) {
+  if (!tekst) return melding('Er valt niets te kopiëren.');
+  try {
+    await navigator.clipboard.writeText(tekst);
+    melding(bevestiging);
+  } catch {
+    // oudere browsers en pagina's zonder https
+    const t = document.createElement('textarea');
+    t.value = tekst;
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.appendChild(t);
+    t.select();
+    try { document.execCommand('copy'); melding(bevestiging); }
+    catch { melding('Kopiëren lukt niet op dit toestel.'); }
+    t.remove();
+  }
 }
 
 function tekenBestellen() {
@@ -2490,7 +2881,7 @@ function tekenHistoriek() {
       <div class="log__delta ${m.delta < 0 ? 'log__delta--min' : 'log__delta--plus'}">${m.delta > 0 ? '+' : ''}${m.delta}</div>
       <div>
         <div class="log__naam">${ontsnap(m.naam)}</div>
-        <div class="log__meta">${ontsnap(m.reden)} · nog ${m.restant}</div>
+        <div class="log__meta">${ontsnap(m.reden)}${m.door ? ' · ' + ontsnap(m.door) : ''} · nog ${m.restant}</div>
       </div>
       <div class="log__tijd">${d.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}</div>`;
     el.appendChild(div);
@@ -2609,6 +3000,152 @@ function tekenLeveranciers() {
     await Store.verwijderLeverancier(naam);
     melding('Leverancier verwijderd.');
   };
+}
+
+/* ===========================================================
+   Cloud
+   =========================================================== */
+
+let syncTimer = null;
+let syncBezig = false;
+
+/** Na elke wijziging: even wachten en dan één keer wegschrijven. */
+function planSync() {
+  if (!Cloud.aangemeld() || !Cloud.team) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(duwNaarCloud, 2500);
+}
+
+async function duwNaarCloud() {
+  if (!Cloud.aangemeld() || !Cloud.team || syncBezig) return;
+  syncBezig = true;
+  try {
+    await Cloud.bewaar(Store.staat);
+    tekenCloud();
+  } catch (e) {
+    melding('Cloud: ' + e.message);
+  } finally {
+    syncBezig = false;
+  }
+}
+
+async function haalCloudOp() {
+  try {
+    const ver = await Cloud.haalOp();
+    if (ver?.data) {
+      const veranderd = Store.samenvoegen(ver.data);
+      if (veranderd) await Store.bewaar();
+    } else {
+      await Cloud.bewaar(Store.staat);      // eerste keer: wat hier staat wordt de basis
+    }
+    tekenCloud();
+  } catch (e) {
+    melding('Cloud: ' + e.message);
+  }
+}
+
+function bindCloud() {
+  $('#log-annuleer').addEventListener('click', () => { $('#modal-login').hidden = true; });
+  $('#team-annuleer').addEventListener('click', () => { $('#modal-team').hidden = true; });
+
+  $('#log-aanmelden').addEventListener('click', async () => {
+    const email = $('#log-email').value.trim();
+    const ww = $('#log-ww').value;
+    if (!email || !ww) return melding('Vul je e-mailadres en wachtwoord in.');
+    try {
+      await Cloud.meldAan(email, ww);
+      $('#log-ww').value = '';
+      $('#modal-login').hidden = true;
+      Store.gebruiker = Cloud.naam;
+      if (!Cloud.team) {
+        $('#team-naam').value = Cloud.naam || '';
+        $('#modal-team').hidden = false;
+      } else {
+        await haalCloudOp();
+        melding('Aangemeld als ' + Cloud.naam);
+      }
+      tekenCloud();
+    } catch (e) { melding(e.message); }
+  });
+
+  $('#team-nieuw').addEventListener('click', async () => {
+    try {
+      await Cloud.maakTeam('Levaux Bouw', $('#team-naam').value.trim());
+      Store.gebruiker = Cloud.naam;
+      $('#modal-team').hidden = true;
+      await haalCloudOp();
+      melding('Gedeelde voorraad aangemaakt.');
+    } catch (e) { melding(e.message); }
+  });
+
+  $('#team-aansluiten').addEventListener('click', async () => {
+    try {
+      await Cloud.sluitAan($('#team-code').value, $('#team-naam').value.trim());
+      Store.gebruiker = Cloud.naam;
+      $('#modal-team').hidden = true;
+      await haalCloudOp();
+      melding('Aangesloten bij de gedeelde voorraad.');
+    } catch (e) { melding(e.message); }
+  });
+}
+
+function tekenCloud() {
+  const paneel = $('#paneel-cloud');
+  if (!paneel) return;
+  paneel.hidden = !Cloud.ingesteld();
+  if (!Cloud.ingesteld()) return;
+
+  const status = $('#cloud-status');
+  const knoppen = $('#cloud-knoppen');
+  knoppen.innerHTML = '';
+
+  if (!Cloud.aangemeld()) {
+    $('#cloud-uitleg').textContent = 'Meld je aan om de voorraad te delen tussen toestellen en automatisch in de cloud te bewaren.';
+    status.innerHTML = '';
+    const b = document.createElement('button');
+    b.className = 'knop';
+    b.textContent = 'Aanmelden';
+    b.onclick = () => { $('#modal-login').hidden = false; };
+    knoppen.appendChild(b);
+    return;
+  }
+
+  $('#cloud-uitleg').textContent = 'De voorraad wordt automatisch bewaard in de cloud en gedeeld met je team.';
+  const sync = Cloud.laatsteSync
+    ? Cloud.laatsteSync.toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })
+    : 'nog niet';
+  status.innerHTML = `
+    <table class="tabel-mini">
+      <tr><td>Aangemeld als</td><td>${ontsnap(Cloud.naam || Cloud.sessie.email)}</td></tr>
+      <tr><td>Team</td><td>${ontsnap(Cloud.team?.naam || '—')}</td></tr>
+      <tr><td>Laatst gesynchroniseerd</td><td>${sync}</td></tr>
+    </table>
+    ${Cloud.team ? `<div class="veld__hulp" style="margin-top:8px">Teamcode om iemand toe te voegen:<br><code style="font-size:.72rem;word-break:break-all">${ontsnap(Cloud.team.id)}</code></div>` : ''}`;
+
+  const nu = document.createElement('button');
+  nu.className = 'knop knop--zwart';
+  nu.textContent = 'Nu synchroniseren';
+  nu.onclick = async () => { await haalCloudOp(); await duwNaarCloud(); melding('Gesynchroniseerd.'); };
+  knoppen.appendChild(nu);
+
+  if (Cloud.team) {
+    const code = document.createElement('button');
+    code.className = 'knop knop--leeg';
+    code.textContent = 'Teamcode kopiëren';
+    code.onclick = () => kopieer(Cloud.team.id, 'Teamcode gekopieerd.');
+    knoppen.appendChild(code);
+  }
+
+  const af = document.createElement('button');
+  af.className = 'knop knop--leeg';
+  af.textContent = 'Afmelden';
+  af.onclick = async () => {
+    await Cloud.meldAf();
+    Store.gebruiker = '';
+    tekenCloud();
+    melding('Afgemeld. De voorraad blijft op dit toestel staan.');
+  };
+  knoppen.appendChild(af);
 }
 
 /* ===========================================================

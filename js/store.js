@@ -16,14 +16,14 @@ const DATAVERSIE = 3;
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
   { key: 'elektra',    label: 'Elektra' },
-  { key: 'sanitair',   label: 'Sanitair & chauffage' },
+  { key: 'sanitair',   label: 'Chauffage & Sanitair' },
   { key: 'ruwbouw',    label: 'Ruwbouw' },
-  { key: 'materialen', label: 'Materialen' }
+  { key: 'materialen', label: 'Gebruiksmaterialen' }
 ];
 
 export const EENHEDEN = ['stuk', 'm', 'm²', 'zak', 'pallet', 'rol', 'kg', 'doos', 'liter'];
 
-export const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Materialen';
+export const labelVanCat = k => HOOFDCATEGORIEEN.find(c => c.key === k)?.label || 'Gebruiksmaterialen';
 
 /* ---------- Adapter: dit toestel (localStorage) ------------ */
 
@@ -176,6 +176,7 @@ function migreer(staat) {
 export const Store = {
   adapter: kiesAdapter(),
   staat: legeStaat(),
+  gebruiker: '',            // naam van wie is aangemeld (voor de historiek)
   _luisteraars: new Set(),
 
   async init(seedUrl) {
@@ -232,6 +233,7 @@ export const Store = {
   _foutmelders: new Set(),
 
   async bewaar() {
+    this.staat.gewijzigd = new Date().toISOString();
     try {
       await this.adapter.bewaren(this.staat);
     } catch (e) {
@@ -346,6 +348,7 @@ export const Store = {
       delta,
       reden,
       note: extra.note || '',
+      door: this.gebruiker || '',
       orderId: extra.orderId || '',
       restant: p.qty
     });
@@ -477,8 +480,52 @@ export const Store = {
     await this.bewaar();
   },
 
+  /* ---------- Samenvoegen met de cloud --------------------
+     Twee toestellen die tegelijk werken: per product wint de
+     laatst gewijzigde versie, en de historiek van beide kanten
+     wordt samengevoegd. Boekt iemand op hetzelfde moment op
+     een ander toestel iets af van hetzelfde product, dan kan
+     die ene afboeking verloren gaan — de historiek toont dat
+     wel. Voor één man met af en toe een tweede toestel is dat
+     ruim voldoende; wil je het waterdicht, dan moet elke
+     afboeking apart naar de server.
+  --------------------------------------------------------- */
+  samenvoegen(ander) {
+    if (!ander || !Array.isArray(ander.producten)) return false;
+    const nieuwer = (a, b) => new Date(a || 0) > new Date(b || 0);
+
+    const perId = new Map(this.staat.producten.map(p => [p.id, p]));
+    // ook op referentie matchen: hetzelfde product kan op twee
+    // toestellen apart zijn aangemaakt
+    const perRef = new Map(this.staat.producten.filter(p => p.refKey).map(p => [p.refKey, p]));
+
+    ander.producten.forEach(rp => {
+      const mijn = perId.get(rp.id) || (rp.refKey && perRef.get(rp.refKey));
+      if (!mijn) {
+        this.staat.producten.push(rp);
+      } else if (nieuwer(rp.gewijzigd, mijn.gewijzigd)) {
+        Object.assign(mijn, rp, { id: mijn.id });
+      }
+    });
+
+    const gezien = new Set(this.staat.mutaties.map(m => m.id));
+    (ander.mutaties || []).forEach(m => { if (!gezien.has(m.id)) this.staat.mutaties.push(m); });
+    this.staat.mutaties.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+    if (this.staat.mutaties.length > 2000) this.staat.mutaties.length = 2000;
+
+    (ander.leveranciers || []).forEach(l => {
+      if (!this.staat.leveranciers.some(x => x.naam.toLowerCase() === l.naam.toLowerCase())) {
+        this.staat.leveranciers.push(l);
+      }
+    });
+    (ander.orders || []).forEach(o => {
+      if (!this.staat.orders.some(x => x.id === o.id)) this.staat.orders.push(o);
+    });
+    return true;
+  },
+
   exportCsv() {
-    const kop = ['Datum', 'Tijd', 'Beweging', 'Aantal', 'Eenheid', 'Merk + product', 'Referentie', 'Leverancier', 'Categorie', 'Restant', 'Opmerking'];
+    const kop = ['Datum', 'Tijd', 'Beweging', 'Aantal', 'Eenheid', 'Merk + product', 'Referentie', 'Leverancier', 'Categorie', 'Restant', 'Door', 'Opmerking'];
     const rijen = this.mutaties().map(m => {
       const d = new Date(m.ts);
       const p = this.viaId(m.productId);
@@ -493,6 +540,7 @@ export const Store = {
         p?.leverancier || '',
         labelVanCat(p?.hoofdcat),
         m.restant,
+        m.door || '',
         m.note
       ];
     });

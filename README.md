@@ -78,13 +78,28 @@ Daarna op de telefoon: site openen in Chrome/Safari → menu → **Toevoegen aan
 
 ## Waar de gegevens staan
 
-Voorlopig in `localStorage` van de browser op het toestel zelf. Dat betekent:
+Altijd in `localStorage` op het toestel zelf — daardoor werkt de app offline. Staat de cloud aan, dan wordt diezelfde voorraad ook automatisch naar Supabase weggeschreven en met je team gedeeld.
 
-- werkt offline en zonder account
-- **staat op één toestel** — de telefoon van Cédric
-- browsergegevens wissen = voorraad weg → **maak regelmatig een back-up** via Instellingen
+## Cloud aanzetten (Supabase)
 
-`js/store.js` praat via een adapter met de opslag. Om naar de cloud te gaan (sync tussen telefoon en laptop, back-up, meerdere gebruikers) hoef je enkel een `CloudAdapter` te schrijven met dezelfde `laden()` en `bewaren()`, en die in `kiesAdapter()` te zetten. De rest van de app blijft ongewijzigd.
+1. Maak een gratis project op **supabase.com**
+2. SQL Editor → plak `supabase/schema.sql` → **Run**
+3. Authentication → Providers → **Email** aanzetten
+4. Authentication → Users → **Add user**: het adres van Cédric (zet *Auto Confirm User* aan als je geen bevestigingsmail wil)
+5. Project Settings → API: kopieer **Project URL** en de **anon public key** naar `config.js`
+6. Commit en push → de app toont voortaan een **Cloud**-blok bij Instellingen
+
+Bij de eerste aanmelding maakt de app een gedeelde voorraad ("team") aan. Wil je er later iemand bij: die persoon krijgt een eigen login, meldt zich aan en plakt de **teamcode** (te kopiëren bij Instellingen → Cloud).
+
+De anon key mag in de code staan: hij geeft op zichzelf geen toegang. De beveiliging zit in de regels op de tabellen — zonder aanmelden en zonder lidmaatschap van het team krijg je niets te zien.
+
+### Hoe de sync werkt
+
+De volledige voorraad gaat als één JSON-blok naar de tabel `voorraad`, twee en een halve seconde na de laatste wijziging. Bij het opstarten haalt de app eerst de cloudversie op en voegt die samen met wat lokaal staat: per product wint de laatst gewijzigde versie, en de historiek van beide kanten wordt samengevoegd.
+
+Werken twee mensen op exact hetzelfde moment aan hetzelfde product, dan kan één afboeking verloren gaan. In de historiek zie je dat wel staan. Voor één man met af en toe een tweede toestel is dat ruim voldoende; wordt het drukker, dan moet elke afboeking apart naar de server in plaats van de hele voorraad in één blok.
+
+`js/store.js` praat via een adapter met de lokale opslag; `js/cloud.js` doet de cloud. Beide staan los van de schermen.
 
 ## Over de twee soorten orderlijsten
 
