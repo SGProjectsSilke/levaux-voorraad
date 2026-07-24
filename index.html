@@ -63,8 +63,17 @@
       <div class="stat"><b id="st-stuks">0</b><span>stuks</span></div>
       <div class="stat stat--waarschuwing"><b id="st-laag">0</b><span>bijbestellen</span></div>
     </div>
+    <div class="selectiebalk" id="selectiebalk">
+      <button id="btn-selecteer">Selecteren</button>
+      <div id="selectie-acties" hidden>
+        <button id="btn-sel-alles">Alles</button>
+        <button id="btn-sel-niets">Niets</button>
+        <button id="btn-sel-verwijder" class="selectiebalk__weg">Verwijderen</button>
+        <button id="btn-sel-stop">Klaar</button>
+      </div>
+    </div>
     <div class="lijst" id="lijst"></div>
-    <p class="voet">Tik een product aan om af te boeken of bij te tellen.</p>
+    <p class="voet" id="voorraad-voet">Tik een product aan om af te boeken of bij te tellen.</p>
   </section>
 
   <!-- ============ INBOEKEN ============ -->
@@ -189,10 +198,10 @@
     </div>
 
     <div class="paneel">
-      <h3>Voorraad opnieuw beginnen</h3>
-      <p>Zet alles terug naar de startlijst van de Cebeo-order, of wis alles.</p>
+      <h3>Opnieuw beginnen</h3>
+      <p>Producten wissen laat je leveranciers, minimumregels en instellingen staan. Alles wissen zet de app terug op nul.</p>
       <div class="knoppen">
-        <button class="knop knop--leeg" id="btn-reset-seed">Terug naar startlijst</button>
+        <button class="knop knop--leeg" id="btn-wis-producten" style="color:var(--rood)">Alle producten wissen</button>
         <button class="knop knop--leeg" id="btn-wis-alles" style="color:var(--rood)">Alles wissen</button>
       </div>
     </div>

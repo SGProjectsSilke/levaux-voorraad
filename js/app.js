@@ -53,7 +53,8 @@ const ui = {
   importLev: 'Cebeo',
   importLevNieuw: false,
   importFormaat: 'cebeo',
-  importFotos: new Map()
+  importFotos: new Map(),
+  selectie: null            // null = niet aan het selecteren, anders een Set met id's
 };
 
 /* ===========================================================
@@ -86,6 +87,7 @@ async function start() {
   bindNavigatie();
   bindFotoviewer();
   bindVoorraad();
+  bindSelectie();
   bindProductModal();
   bindBewerkModal();
   bindInboeken();
@@ -267,13 +269,43 @@ function tekenChips() {
   }
 }
 
-function tekenVoorraad() {
-  tekenChips();
-  const c = Store.cijfers();
-  $('#st-soorten').textContent = c.soorten;
-  $('#st-stuks').textContent = c.stuks.toLocaleString('nl-BE');
-  $('#st-laag').textContent = c.laag;
+/** De knoppen boven de lijst: selecteren, alles/niets, verwijderen. */
+function tekenSelectiebalk(zichtbaar) {
+  const aan = !!ui.selectie;
+  $('#btn-selecteer').hidden = aan;
+  $('#selectie-acties').hidden = !aan;
+  $('#voorraad-voet').textContent = aan
+    ? 'Tik de producten aan die weg mogen.'
+    : 'Tik een product aan om af te boeken of bij te tellen.';
+  if (!aan) return;
 
+  const n = ui.selectie.size;
+  const knop = $('#btn-sel-verwijder');
+  knop.textContent = n ? `Verwijderen (${n})` : 'Verwijderen';
+  knop.disabled = !n;
+  $('#btn-sel-alles').textContent = `Alles (${zichtbaar.length})`;
+}
+
+function bindSelectie() {
+  $('#btn-selecteer').addEventListener('click', () => { ui.selectie = new Set(); tekenVoorraad(); });
+  $('#btn-sel-stop').addEventListener('click', () => { ui.selectie = null; tekenVoorraad(); });
+  $('#btn-sel-niets').addEventListener('click', () => { ui.selectie.clear(); tekenVoorraad(); });
+  $('#btn-sel-alles').addEventListener('click', () => {
+    zichtbareProducten().forEach(p => ui.selectie.add(p.id));
+    tekenVoorraad();
+  });
+  $('#btn-sel-verwijder').addEventListener('click', async () => {
+    const n = ui.selectie.size;
+    if (!n) return;
+    if (!confirm(`${n} product${n === 1 ? '' : 'en'} definitief verwijderen?\n\nDe historiek blijft staan. Op je andere toestellen verdwijnen ze bij de volgende synchronisatie.`)) return;
+    await Store.verwijderProducten([...ui.selectie]);
+    ui.selectie = new Set();
+    melding(`${n} product${n === 1 ? '' : 'en'} verwijderd.`);
+  });
+}
+
+/** De producten die nu in de lijst staan, met alle filters erop. */
+function zichtbareProducten() {
   let lijst = Store.zoek(ui.zoek);
   if (ui.cat === '__laag') {
     const ids = new Set(Store.teBestellen().map(p => p.id));
@@ -282,23 +314,41 @@ function tekenVoorraad() {
     lijst = lijst.filter(p => p.hoofdcat === ui.cat);
   }
   if (ui.lev) lijst = lijst.filter(p => p.leverancier === ui.lev);
-  lijst = [...lijst].sort((a, b) => (a.brand + a.name).localeCompare(b.brand + b.name, 'nl'));
+  return [...lijst].sort((a, b) => (a.brand + a.name).localeCompare(b.brand + b.name, 'nl'));
+}
+
+function tekenVoorraad() {
+  tekenChips();
+  const c = Store.cijfers();
+  $('#st-soorten').textContent = c.soorten;
+  $('#st-stuks').textContent = c.stuks.toLocaleString('nl-BE');
+  $('#st-laag').textContent = c.laag;
+
+  const lijst = zichtbareProducten();
 
   const el = $('#lijst');
   el.innerHTML = '';
+  const kiesbaar = !!ui.selectie;
+  tekenSelectiebalk(lijst);
+
   if (!lijst.length) {
-    el.innerHTML = `<div class="leeg"><span>🔎</span>Niets gevonden.<br>Probeer een ander zoekwoord of voeg het product toe via <b>Inboeken</b>.</div>`;
+    el.innerHTML = Store.producten().length
+      ? `<div class="leeg"><span>🔎</span>Niets gevonden.<br>Probeer een ander zoekwoord.</div>`
+      : `<div class="leeg"><span>📦</span>Nog geen producten.<br>Lees een bestelbon in of voeg er handmatig één toe via <b>Inboeken</b>.</div>`;
     return;
   }
-  lijst.forEach(p => el.appendChild(kaart(p)));
+  lijst.forEach(p => el.appendChild(kaart(p, kiesbaar)));
 }
 
-function kaart(p) {
+function kaart(p, kiesbaar = false) {
   const laag = p.type !== 'kost' && p.min > 0 && p.qty <= p.min;
   const op = p.qty === 0;
+  const gekozen = kiesbaar && ui.selectie.has(p.id);
   const div = document.createElement('div');
-  div.className = 'kaart' + (op ? ' kaart--op' : laag ? ' kaart--laag' : '');
+  div.className = 'kaart' + (op ? ' kaart--op' : laag ? ' kaart--laag' : '')
+    + (kiesbaar ? ' kaart--kiezen kaart--kiesbaar' : '') + (gekozen ? ' kaart--gekozen' : '');
   div.innerHTML = `
+    ${kiesbaar ? '<div class="kaart__vink">&#10003;</div>' : ''}
     <div class="kaart__foto">${p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p)}</div>
     <div class="kaart__info">
       <div class="kaart__merk">${ontsnap(p.brand || p.leverancier || labelVanCat(p.hoofdcat))}</div>
@@ -309,6 +359,15 @@ function kaart(p) {
       <div class="aantal-bol ${op ? 'aantal-bol--op' : laag ? 'aantal-bol--laag' : ''}">${p.qty}${p.eenheid && p.eenheid !== 'stuk' ? ' <small>' + ontsnap(p.eenheid) + '</small>' : ''}</div>
       <button class="mini-min" title="1 afboeken">−</button>
     </div>`;
+  if (kiesbaar) {
+    div.addEventListener('click', () => {
+      if (ui.selectie.has(p.id)) ui.selectie.delete(p.id);
+      else ui.selectie.add(p.id);
+      tekenVoorraad();
+    });
+    return div;
+  }
+
   div.addEventListener('click', () => opendProduct(p.id));
   div.querySelector('.mini-min').addEventListener('click', async e => {
     e.stopPropagation();
@@ -461,7 +520,8 @@ function bindBewerkModal() {
 function tekenLijktOp() {
   const el = $('#b-lijkt-op');
   const naam = $('#b-naam').value.trim();
-  const lijst = naam.length >= 4 ? Store.gelijkaardig(naam, bewerkId || '') : [];
+  // enkel bij een nieuw product; bij bewerken heeft het geen zin
+  const lijst = (!bewerkId && naam.length >= 4) ? Store.gelijkaardig(naam) : [];
   el.hidden = !lijst.length;
   if (!lijst.length) return;
 
@@ -516,6 +576,7 @@ function openBewerk(pid, metCamera = false) {
   $('#b-eenheid').value = p?.eenheid || 'stuk';
   $('#b-foto').value = '';
   $('#b-verwijder').style.display = p ? '' : 'none';
+  tekenLijktOp();                      // lijst van een vorige keer opruimen
   tekenFotoVoorbeeld();
   $('#modal-bewerk').hidden = false;
   if (metCamera) $('#b-foto').click();
@@ -971,10 +1032,12 @@ function bindInstellingen() {
     } catch (err) { melding(err.message); }
   });
 
-  $('#btn-reset-seed').addEventListener('click', async () => {
-    if (!confirm('Alles terugzetten naar de startlijst van de Cebeo-order? Je historiek gaat verloren.')) return;
-    await Store.zetStartlijst('data/seed.json');
-    melding('Startlijst teruggezet.');
+  $('#btn-wis-producten').addEventListener('click', async () => {
+    const n = Store.producten().length;
+    if (!n) return melding('Er staan al geen producten in.');
+    if (!confirm(`Alle ${n} producten en de historiek wissen?\n\nLeveranciers, minimumregels en je aanmelding blijven staan. Dit werkt ook door op je andere toestellen.`)) return;
+    await Store.wisProducten();
+    melding(`${n} producten gewist. Schone lei.`);
     toon('voorraad');
   });
 

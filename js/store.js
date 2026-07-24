@@ -10,8 +10,8 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.5.0';
-const DATAVERSIE = 4;
+export const VERSIE = '1.6.0';
+const DATAVERSIE = 5;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
@@ -175,6 +175,10 @@ function legeStaat() {
       { naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' }
     ],
     orders: [],
+    // Verwijderde producten laten een spoor na. Zonder dat spoor komt een
+    // product dat je hier wist gewoon terug zodra een ander toestel zijn
+    // versie naar de cloud stuurt.
+    verwijderd: [],
     instellingen: {}
   };
 }
@@ -199,12 +203,17 @@ function migreer(staat) {
     }
     staat.versie = 3;
   }
+  if (!Array.isArray(staat.verwijderd)) staat.verwijderd = [];
   if (staat.versie < 4) {
     staat.producten.forEach(p => {
       const regel = regelVoor(p.brand, p.name);
       if (regel) { p.min = regel.min; p.minAuto = true; }
     });
     staat.versie = 4;
+  }
+  if (staat.versie < 5) {
+    staat.verwijderd = staat.verwijderd || [];
+    staat.versie = 5;
   }
   return staat;
 }
@@ -258,9 +267,12 @@ export const Store = {
           gewijzigd: nu
         });
       });
-      this.staat.orders.push({
-        id: id(), ts: nu, label: seed.order?.label || 'Startvoorraad', regels: seed.products.length
-      });
+      if (seed.products.length) {
+        this.staat.orders.push({
+          id: id(), ts: nu, label: seed.order?.label || 'Startvoorraad', regels: seed.products.length
+        });
+      }
+      this.staat.uitStartlijst = true;   // nog niets van de gebruiker zelf
     } catch (e) {
       console.warn('Startlijst niet gevonden:', e);
     }
@@ -367,8 +379,44 @@ export const Store = {
   },
 
   async verwijderProduct(pid) {
+    this._noteerVerwijderd([pid]);
     this.staat.producten = this.staat.producten.filter(p => p.id !== pid);
     await this.bewaar();
+  },
+
+  /** Meerdere producten tegelijk verwijderen. */
+  async verwijderProducten(ids) {
+    const set = new Set(ids);
+    if (!set.size) return 0;
+    this._noteerVerwijderd([...set]);
+    this.staat.producten = this.staat.producten.filter(p => !set.has(p.id));
+    await this.bewaar();
+    return set.size;
+  },
+
+  /** Alles weg, maar leveranciers, regels en instellingen blijven. */
+  async wisProducten() {
+    const n = this.staat.producten.length;
+    this._noteerVerwijderd(this.staat.producten.map(p => p.id));
+    this.staat.producten = [];
+    this.staat.mutaties = [];
+    this.staat.orders = [];
+    this.staat.uitStartlijst = false;
+    await this.bewaar();
+    return n;
+  },
+
+  _noteerVerwijderd(ids) {
+    const nu = new Date().toISOString();
+    ids.forEach(pid => {
+      const p = this.viaId(pid);
+      if (p) this.staat.verwijderd.push({ id: p.id, refKey: p.refKey, ts: nu });
+    });
+    // een half jaar bewaren is ruim genoeg om terugkeer te voorkomen
+    const grens = Date.now() - 183 * 24 * 3600 * 1000;
+    this.staat.verwijderd = this.staat.verwijderd
+      .filter(v => new Date(v.ts).getTime() > grens)
+      .slice(-1000);
   },
 
   /* ---------- Bewegingen ----------------------------------- */
@@ -456,18 +504,32 @@ export const Store = {
     return n;
   },
 
-  /** Producten met een gelijkaardige naam — om dubbels te vermijden. */
+  /**
+   * Producten met een gelijkaardige naam — om dubbels te vermijden.
+   * We vergelijken in twee richtingen: hoeveel van de getypte woorden komen
+   * voor, én hoeveel woorden telt het bestaande product. Anders lijkt een
+   * lange naam al snel op een korte omdat er toevallig één woord in staat.
+   */
   gelijkaardig(naam, negeerId = '') {
-    const woorden = String(naam).toLowerCase().replace(/[^a-z0-9à-ÿ ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-    if (!woorden.length) return [];
+    const splits = t => String(t).toLowerCase()
+      .replace(/[^a-z0-9à-ÿ ]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    const woorden = splits(naam);
+    if (woorden.length < 1) return [];
+
     return this.staat.producten
       .filter(p => p.id !== negeerId)
       .map(p => {
-        const t = (p.brand + ' ' + p.name).toLowerCase();
-        const raak = woorden.filter(w => t.includes(w)).length;
-        return { p, score: raak / woorden.length };
+        const andere = splits(p.brand + ' ' + p.name);
+        const gemeen = woorden.filter(w => andere.some(a => a === w || a.includes(w) || w.includes(a)));
+        const score = gemeen.length / Math.max(woorden.length, andere.length);
+        // minstens één echt woord gemeenschappelijk, geen toevallige "wit"
+        const stevig = gemeen.some(w => w.length >= 4);
+        return { p, score: stevig ? score : 0 };
       })
-      .filter(x => x.score >= 0.6)
+      .filter(x => x.score >= 0.5)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .map(x => x.p);
@@ -569,12 +631,29 @@ export const Store = {
     if (!ander || !Array.isArray(ander.producten)) return false;
     const nieuwer = (a, b) => new Date(a || 0) > new Date(b || 0);
 
+    // sporen van beide kanten samenleggen
+    const sporen = [...(this.staat.verwijderd || [])];
+    (ander.verwijderd || []).forEach(v => {
+      if (!sporen.some(x => x.id === v.id && x.ts === v.ts)) sporen.push(v);
+    });
+    this.staat.verwijderd = sporen;
+    const gewist = (p) => sporen.find(v => v.id === p.id || (v.refKey && v.refKey === p.refKey));
+
+    // hier verwijderd, elders nog niet → hier verwijderd houden
+    // elders verwijderd, hier nog wel → ook hier weghalen
+    this.staat.producten = this.staat.producten.filter(p => {
+      const spoor = gewist(p);
+      return !(spoor && nieuwer(spoor.ts, p.gewijzigd));
+    });
+
     const perId = new Map(this.staat.producten.map(p => [p.id, p]));
     // ook op referentie matchen: hetzelfde product kan op twee
     // toestellen apart zijn aangemaakt
     const perRef = new Map(this.staat.producten.filter(p => p.refKey).map(p => [p.refKey, p]));
 
     ander.producten.forEach(rp => {
+      const spoor = gewist(rp);
+      if (spoor && nieuwer(spoor.ts, rp.gewijzigd)) return;      // bewust verwijderd
       const mijn = perId.get(rp.id) || (rp.refKey && perRef.get(rp.refKey));
       if (!mijn) {
         this.staat.producten.push(rp);

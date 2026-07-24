@@ -225,6 +225,36 @@ main { padding: 14px 12px 24px; max-width: 720px; margin: 0 auto; }
 .stat span { font-size: .66rem; text-transform: uppercase; letter-spacing: .07em; color: var(--grijs-600); }
 .stat--waarschuwing b { color: var(--rood); }
 
+/* ---------- Selecteren en verwijderen ---------------------- */
+
+.selectiebalk {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 7px; margin: 2px 2px 8px; flex-wrap: wrap;
+}
+.selectiebalk button {
+  font-size: .76rem; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px;
+  background: var(--wit); color: var(--grijs-600);
+  border: 1px solid var(--grijs-200);
+}
+.selectiebalk button:active { background: var(--grijs-100); }
+.selectiebalk__weg { background: var(--rood) !important; color: var(--wit) !important; border-color: var(--rood) !important; }
+.selectiebalk__weg[disabled] { opacity: .4; }
+#selectie-acties { display: flex; gap: 7px; flex-wrap: wrap; }
+
+.kaart--kiesbaar { cursor: pointer; }
+.kaart--gekozen { outline: 2px solid var(--rood); outline-offset: -2px; background: var(--rood-licht); }
+.kaart__vink {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--grijs-200);
+  display: grid; place-items: center;
+  color: transparent; font-size: .85rem; font-weight: 700;
+}
+.kaart--gekozen .kaart__vink { background: var(--rood); border-color: var(--rood); color: var(--wit); }
+.kaart--kiezen { grid-template-columns: 26px 50px minmax(0, 1fr); }
+.kaart--kiezen .kaart__aantal { display: none; }
+
 /* ---------- Productkaart ---------------------------------- */
 
 .lijst { display: flex; flex-direction: column; gap: 8px; }
@@ -760,8 +790,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <div class="stat"><b id="st-stuks">0</b><span>stuks</span></div>
       <div class="stat stat--waarschuwing"><b id="st-laag">0</b><span>bijbestellen</span></div>
     </div>
+    <div class="selectiebalk" id="selectiebalk">
+      <button id="btn-selecteer">Selecteren</button>
+      <div id="selectie-acties" hidden>
+        <button id="btn-sel-alles">Alles</button>
+        <button id="btn-sel-niets">Niets</button>
+        <button id="btn-sel-verwijder" class="selectiebalk__weg">Verwijderen</button>
+        <button id="btn-sel-stop">Klaar</button>
+      </div>
+    </div>
     <div class="lijst" id="lijst"></div>
-    <p class="voet">Tik een product aan om af te boeken of bij te tellen.</p>
+    <p class="voet" id="voorraad-voet">Tik een product aan om af te boeken of bij te tellen.</p>
   </section>
 
   <!-- ============ INBOEKEN ============ -->
@@ -886,10 +925,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <div class="paneel">
-      <h3>Voorraad opnieuw beginnen</h3>
-      <p>Zet alles terug naar de startlijst van de Cebeo-order, of wis alles.</p>
+      <h3>Opnieuw beginnen</h3>
+      <p>Producten wissen laat je leveranciers, minimumregels en instellingen staan. Alles wissen zet de app terug op nul.</p>
       <div class="knoppen">
-        <button class="knop knop--leeg" id="btn-reset-seed">Terug naar startlijst</button>
+        <button class="knop knop--leeg" id="btn-wis-producten" style="color:var(--rood)">Alle producten wissen</button>
         <button class="knop knop--leeg" id="btn-wis-alles" style="color:var(--rood)">Alles wissen</button>
       </div>
     </div>
@@ -1061,42 +1100,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 <script type="module">
 window.__SEED__ = {
   "order": {
-    "label": "Cebeo order (startvoorraad)",
-    "source": "screenshots 24/07/2026",
+    "label": "Lege start",
     "leverancier": "Cebeo",
     "hoofdcat": "elektra",
-    "lines": 27,
-    "opmerking": "De regel 'DIVERS - Km heffing' uit de order is geen materiaal en staat dus niet in de voorraad."
+    "lines": 0,
+    "opmerking": "Bewust leeg: Cedric begint met een schone lei en boekt zijn eerste bestelbon zelf in. De oude Cebeo-startlijst zit nog in de geschiedenis van de repo."
   },
-  "products": [
-    { "ref": "WDK40060G",      "brand": "OBO BETTERMANN", "name": "Kabelgoot met deksel WDK 40x60 grijs", "qty": 28,  "price": 6.76,    "min": 10,  "cat": "kabelgoot" },
-    { "ref": "136-76200",      "brand": "NIKO",           "name": "Afdekplaat INTENSE (60mm) 2-voudig verticaal, matt zwart", "qty": 2, "price": 8.81, "min": 2, "cat": "afdekplaat" },
-    { "ref": "403138",         "brand": "LEGRAND",        "name": "Automaat TX³ 3kA 4P C25 400V - 4 modules", "qty": 10, "price": 29.49, "min": 4, "cat": "automaat" },
-    { "ref": "467030000",      "brand": "TEC 7",          "name": "Reinigingsdoekjes POWERWIPES - dispenser 70 stuks", "qty": 5, "price": 12.40, "min": 2, "cat": "verbruik" },
-    { "ref": "101-76100",      "brand": "NIKO",           "name": "Enkelvoudige afdekplaat, wit", "qty": 70, "price": 1.31, "min": 20, "cat": "afdekplaat" },
-    { "ref": "403139",         "brand": "LEGRAND",        "name": "Automaat TX³ 3kA 4P C32 400V - 4 modules", "qty": 10, "price": 29.49, "min": 4, "cat": "automaat" },
-    { "ref": "101-76800",      "brand": "NIKO",           "name": "Tweevoudige afdekplaat met 71mm centerafstand, wit", "qty": 50, "price": 3.00, "min": 15, "cat": "afdekplaat" },
-    { "ref": "700-84202",      "brand": "NIKO",           "name": "Hydro spuitwaterdichte dubbele opbouwdoos, 2 functies, 2 m20-ingangen", "qty": 100, "price": 6.54, "min": 25, "cat": "doos" },
-    { "ref": "101-66601",      "brand": "NIKO",           "name": "Centraalplaat stopcontact met penaarde, 28,5mm, wit", "qty": 100, "price": 1.43, "min": 25, "cat": "stopcontact" },
-    { "ref": "101-76700",      "brand": "NIKO",           "name": "Drievoudige afdekplaat met 71mm centerafstand, wit", "qty": 20, "price": 4.93, "min": 6, "cat": "afdekplaat" },
-    { "ref": "FOR150T72G4",    "brand": "Vynckier (ABB)", "name": "Verdeelkast FOR150T72G4 Doorzichtige deur", "qty": 6, "price": 110.66, "min": 2, "cat": "verdeelkast" },
-    { "ref": "700-84102",      "brand": "NIKO",           "name": "Hydro spuitwaterdichte opbouwdoos voor 1 functie, met 2 m20-ingangen", "qty": 100, "price": 3.50, "min": 25, "cat": "doos" },
-    { "ref": "270042",         "brand": "Haupa",          "name": "Adereindhuls, geïsoleerd, 10mm², L 12mm, bruin Franse kleur, afm. DIN46228-4", "qty": 500, "price": 0.07, "min": 100, "cat": "verbruik" },
-    { "ref": "MTV500E",        "brand": "Yokis",          "name": "Inbouw dimmermodule 500W, 230V", "qty": 4, "price": 35.25, "min": 2, "cat": "module" },
-    { "ref": "G7260SCVICS",    "brand": "MIELE",          "name": "Vaatwasser voll.int., QuickPowerWash, 10 progr, ComfortClose, besteklade, A", "qty": 1, "price": 1085.72, "min": 0, "cat": "toestel" },
-    { "ref": "100-76700",      "brand": "NIKO",           "name": "Afdekplaat (71mm) 3-voudig horizontaal, crème", "qty": 25, "price": 5.75, "min": 8, "cat": "afdekplaat" },
-    { "ref": "PIN30827DG9G4",  "brand": "LEDVANCE",       "name": "LED PIN30 DIM 3W 827 CL G9 P", "qty": 2, "price": 9.40, "min": 2, "cat": "lamp" },
-    { "ref": "100-76800",      "brand": "NIKO",           "name": "Afdekplaat (71mm) 2-voudig horizontaal, crème", "qty": 50, "price": 3.49, "min": 15, "cat": "afdekplaat" },
-    { "ref": "101-76900",      "brand": "NIKO",           "name": "Blindplaat, sokkel en afwerkingsset, wit", "qty": 20, "price": 3.30, "min": 6, "cat": "afdekplaat" },
-    { "ref": "700-36605",      "brand": "NIKO",           "name": "Hydro spuitwaterdicht stopcontact met penaarde en insteekklemmen, grijs", "qty": 100, "price": 6.70, "min": 25, "cat": "stopcontact" },
-    { "ref": "MARX025925",     "brand": "MARXMAN",        "name": "Marxman marker diepe gaten 45 tot 90mm - zwart", "qty": 10, "price": 9.99, "min": 3, "cat": "gereedschap" },
-    { "ref": "170-01605",      "brand": "NIKO",           "name": "Sokkel wissel(trek)schakelaar 10A, insteekklemmen", "qty": 150, "price": 3.21, "min": 40, "cat": "schakelaar" },
-    { "ref": "IS2140EC0B",     "brand": "STEINEL H&B",    "name": "Steinel Infrarood-bewegingsmelder IS 2140 ECO zwart", "qty": 3, "price": 29.93, "min": 2, "cat": "sensor" },
-    { "ref": "411942",         "brand": "LEGRAND",        "name": "Differentieelschakelaar TX³ 4P 300mA 40A Type A - 4 modules", "qty": 15, "price": 40.31, "min": 5, "cat": "automaat" },
-    { "ref": "100-76200",      "brand": "NIKO",           "name": "Afdekplaat (60mm) 2-voudig verticaal, crème", "qty": 50, "price": 3.08, "min": 15, "cat": "afdekplaat" },
-    { "ref": "SELEKTA170T0P3", "brand": "THEBEN",         "name": "Digitale astronomische klok 230V 50-60Hz 1CO 125A", "qty": 1, "price": 125.76, "min": 1, "cat": "module" },
-    { "ref": "101-61105",      "brand": "NIKO",           "name": "Toets enkelvoudige schakelaar of drukknop, wit", "qty": 100, "price": 1.79, "min": 25, "cat": "schakelaar" }
-  ]
+  "products": []
 };
 
 window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
@@ -1113,8 +1123,8 @@ window.LEVAUX_CONFIG = { supabaseUrl: "", supabaseKey: "" };
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-const VERSIE = '1.5.0';
-const DATAVERSIE = 4;
+const VERSIE = '1.6.0';
+const DATAVERSIE = 5;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 const HOOFDCATEGORIEEN = [
@@ -1278,6 +1288,10 @@ function legeStaat() {
       { naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' }
     ],
     orders: [],
+    // Verwijderde producten laten een spoor na. Zonder dat spoor komt een
+    // product dat je hier wist gewoon terug zodra een ander toestel zijn
+    // versie naar de cloud stuurt.
+    verwijderd: [],
     instellingen: {}
   };
 }
@@ -1302,12 +1316,17 @@ function migreer(staat) {
     }
     staat.versie = 3;
   }
+  if (!Array.isArray(staat.verwijderd)) staat.verwijderd = [];
   if (staat.versie < 4) {
     staat.producten.forEach(p => {
       const regel = regelVoor(p.brand, p.name);
       if (regel) { p.min = regel.min; p.minAuto = true; }
     });
     staat.versie = 4;
+  }
+  if (staat.versie < 5) {
+    staat.verwijderd = staat.verwijderd || [];
+    staat.versie = 5;
   }
   return staat;
 }
@@ -1361,9 +1380,12 @@ const Store = {
           gewijzigd: nu
         });
       });
-      this.staat.orders.push({
-        id: id(), ts: nu, label: seed.order?.label || 'Startvoorraad', regels: seed.products.length
-      });
+      if (seed.products.length) {
+        this.staat.orders.push({
+          id: id(), ts: nu, label: seed.order?.label || 'Startvoorraad', regels: seed.products.length
+        });
+      }
+      this.staat.uitStartlijst = true;   // nog niets van de gebruiker zelf
     } catch (e) {
       console.warn('Startlijst niet gevonden:', e);
     }
@@ -1470,8 +1492,44 @@ const Store = {
   },
 
   async verwijderProduct(pid) {
+    this._noteerVerwijderd([pid]);
     this.staat.producten = this.staat.producten.filter(p => p.id !== pid);
     await this.bewaar();
+  },
+
+  /** Meerdere producten tegelijk verwijderen. */
+  async verwijderProducten(ids) {
+    const set = new Set(ids);
+    if (!set.size) return 0;
+    this._noteerVerwijderd([...set]);
+    this.staat.producten = this.staat.producten.filter(p => !set.has(p.id));
+    await this.bewaar();
+    return set.size;
+  },
+
+  /** Alles weg, maar leveranciers, regels en instellingen blijven. */
+  async wisProducten() {
+    const n = this.staat.producten.length;
+    this._noteerVerwijderd(this.staat.producten.map(p => p.id));
+    this.staat.producten = [];
+    this.staat.mutaties = [];
+    this.staat.orders = [];
+    this.staat.uitStartlijst = false;
+    await this.bewaar();
+    return n;
+  },
+
+  _noteerVerwijderd(ids) {
+    const nu = new Date().toISOString();
+    ids.forEach(pid => {
+      const p = this.viaId(pid);
+      if (p) this.staat.verwijderd.push({ id: p.id, refKey: p.refKey, ts: nu });
+    });
+    // een half jaar bewaren is ruim genoeg om terugkeer te voorkomen
+    const grens = Date.now() - 183 * 24 * 3600 * 1000;
+    this.staat.verwijderd = this.staat.verwijderd
+      .filter(v => new Date(v.ts).getTime() > grens)
+      .slice(-1000);
   },
 
   /* ---------- Bewegingen ----------------------------------- */
@@ -1559,18 +1617,32 @@ const Store = {
     return n;
   },
 
-  /** Producten met een gelijkaardige naam — om dubbels te vermijden. */
+  /**
+   * Producten met een gelijkaardige naam — om dubbels te vermijden.
+   * We vergelijken in twee richtingen: hoeveel van de getypte woorden komen
+   * voor, én hoeveel woorden telt het bestaande product. Anders lijkt een
+   * lange naam al snel op een korte omdat er toevallig één woord in staat.
+   */
   gelijkaardig(naam, negeerId = '') {
-    const woorden = String(naam).toLowerCase().replace(/[^a-z0-9à-ÿ ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
-    if (!woorden.length) return [];
+    const splits = t => String(t).toLowerCase()
+      .replace(/[^a-z0-9à-ÿ ]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+
+    const woorden = splits(naam);
+    if (woorden.length < 1) return [];
+
     return this.staat.producten
       .filter(p => p.id !== negeerId)
       .map(p => {
-        const t = (p.brand + ' ' + p.name).toLowerCase();
-        const raak = woorden.filter(w => t.includes(w)).length;
-        return { p, score: raak / woorden.length };
+        const andere = splits(p.brand + ' ' + p.name);
+        const gemeen = woorden.filter(w => andere.some(a => a === w || a.includes(w) || w.includes(a)));
+        const score = gemeen.length / Math.max(woorden.length, andere.length);
+        // minstens één echt woord gemeenschappelijk, geen toevallige "wit"
+        const stevig = gemeen.some(w => w.length >= 4);
+        return { p, score: stevig ? score : 0 };
       })
-      .filter(x => x.score >= 0.6)
+      .filter(x => x.score >= 0.5)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .map(x => x.p);
@@ -1672,12 +1744,29 @@ const Store = {
     if (!ander || !Array.isArray(ander.producten)) return false;
     const nieuwer = (a, b) => new Date(a || 0) > new Date(b || 0);
 
+    // sporen van beide kanten samenleggen
+    const sporen = [...(this.staat.verwijderd || [])];
+    (ander.verwijderd || []).forEach(v => {
+      if (!sporen.some(x => x.id === v.id && x.ts === v.ts)) sporen.push(v);
+    });
+    this.staat.verwijderd = sporen;
+    const gewist = (p) => sporen.find(v => v.id === p.id || (v.refKey && v.refKey === p.refKey));
+
+    // hier verwijderd, elders nog niet → hier verwijderd houden
+    // elders verwijderd, hier nog wel → ook hier weghalen
+    this.staat.producten = this.staat.producten.filter(p => {
+      const spoor = gewist(p);
+      return !(spoor && nieuwer(spoor.ts, p.gewijzigd));
+    });
+
     const perId = new Map(this.staat.producten.map(p => [p.id, p]));
     // ook op referentie matchen: hetzelfde product kan op twee
     // toestellen apart zijn aangemaakt
     const perRef = new Map(this.staat.producten.filter(p => p.refKey).map(p => [p.refKey, p]));
 
     ander.producten.forEach(rp => {
+      const spoor = gewist(rp);
+      if (spoor && nieuwer(spoor.ts, rp.gewijzigd)) return;      // bewust verwijderd
       const mijn = perId.get(rp.id) || (rp.refKey && perRef.get(rp.refKey));
       if (!mijn) {
         this.staat.producten.push(rp);
@@ -2532,7 +2621,8 @@ const ui = {
   importLev: 'Cebeo',
   importLevNieuw: false,
   importFormaat: 'cebeo',
-  importFotos: new Map()
+  importFotos: new Map(),
+  selectie: null            // null = niet aan het selecteren, anders een Set met id's
 };
 
 /* ===========================================================
@@ -2565,6 +2655,7 @@ async function start() {
   bindNavigatie();
   bindFotoviewer();
   bindVoorraad();
+  bindSelectie();
   bindProductModal();
   bindBewerkModal();
   bindInboeken();
@@ -2746,13 +2837,43 @@ function tekenChips() {
   }
 }
 
-function tekenVoorraad() {
-  tekenChips();
-  const c = Store.cijfers();
-  $('#st-soorten').textContent = c.soorten;
-  $('#st-stuks').textContent = c.stuks.toLocaleString('nl-BE');
-  $('#st-laag').textContent = c.laag;
+/** De knoppen boven de lijst: selecteren, alles/niets, verwijderen. */
+function tekenSelectiebalk(zichtbaar) {
+  const aan = !!ui.selectie;
+  $('#btn-selecteer').hidden = aan;
+  $('#selectie-acties').hidden = !aan;
+  $('#voorraad-voet').textContent = aan
+    ? 'Tik de producten aan die weg mogen.'
+    : 'Tik een product aan om af te boeken of bij te tellen.';
+  if (!aan) return;
 
+  const n = ui.selectie.size;
+  const knop = $('#btn-sel-verwijder');
+  knop.textContent = n ? `Verwijderen (${n})` : 'Verwijderen';
+  knop.disabled = !n;
+  $('#btn-sel-alles').textContent = `Alles (${zichtbaar.length})`;
+}
+
+function bindSelectie() {
+  $('#btn-selecteer').addEventListener('click', () => { ui.selectie = new Set(); tekenVoorraad(); });
+  $('#btn-sel-stop').addEventListener('click', () => { ui.selectie = null; tekenVoorraad(); });
+  $('#btn-sel-niets').addEventListener('click', () => { ui.selectie.clear(); tekenVoorraad(); });
+  $('#btn-sel-alles').addEventListener('click', () => {
+    zichtbareProducten().forEach(p => ui.selectie.add(p.id));
+    tekenVoorraad();
+  });
+  $('#btn-sel-verwijder').addEventListener('click', async () => {
+    const n = ui.selectie.size;
+    if (!n) return;
+    if (!confirm(`${n} product${n === 1 ? '' : 'en'} definitief verwijderen?\n\nDe historiek blijft staan. Op je andere toestellen verdwijnen ze bij de volgende synchronisatie.`)) return;
+    await Store.verwijderProducten([...ui.selectie]);
+    ui.selectie = new Set();
+    melding(`${n} product${n === 1 ? '' : 'en'} verwijderd.`);
+  });
+}
+
+/** De producten die nu in de lijst staan, met alle filters erop. */
+function zichtbareProducten() {
   let lijst = Store.zoek(ui.zoek);
   if (ui.cat === '__laag') {
     const ids = new Set(Store.teBestellen().map(p => p.id));
@@ -2761,23 +2882,41 @@ function tekenVoorraad() {
     lijst = lijst.filter(p => p.hoofdcat === ui.cat);
   }
   if (ui.lev) lijst = lijst.filter(p => p.leverancier === ui.lev);
-  lijst = [...lijst].sort((a, b) => (a.brand + a.name).localeCompare(b.brand + b.name, 'nl'));
+  return [...lijst].sort((a, b) => (a.brand + a.name).localeCompare(b.brand + b.name, 'nl'));
+}
+
+function tekenVoorraad() {
+  tekenChips();
+  const c = Store.cijfers();
+  $('#st-soorten').textContent = c.soorten;
+  $('#st-stuks').textContent = c.stuks.toLocaleString('nl-BE');
+  $('#st-laag').textContent = c.laag;
+
+  const lijst = zichtbareProducten();
 
   const el = $('#lijst');
   el.innerHTML = '';
+  const kiesbaar = !!ui.selectie;
+  tekenSelectiebalk(lijst);
+
   if (!lijst.length) {
-    el.innerHTML = `<div class="leeg"><span>🔎</span>Niets gevonden.<br>Probeer een ander zoekwoord of voeg het product toe via <b>Inboeken</b>.</div>`;
+    el.innerHTML = Store.producten().length
+      ? `<div class="leeg"><span>🔎</span>Niets gevonden.<br>Probeer een ander zoekwoord.</div>`
+      : `<div class="leeg"><span>📦</span>Nog geen producten.<br>Lees een bestelbon in of voeg er handmatig één toe via <b>Inboeken</b>.</div>`;
     return;
   }
-  lijst.forEach(p => el.appendChild(kaart(p)));
+  lijst.forEach(p => el.appendChild(kaart(p, kiesbaar)));
 }
 
-function kaart(p) {
+function kaart(p, kiesbaar = false) {
   const laag = p.type !== 'kost' && p.min > 0 && p.qty <= p.min;
   const op = p.qty === 0;
+  const gekozen = kiesbaar && ui.selectie.has(p.id);
   const div = document.createElement('div');
-  div.className = 'kaart' + (op ? ' kaart--op' : laag ? ' kaart--laag' : '');
+  div.className = 'kaart' + (op ? ' kaart--op' : laag ? ' kaart--laag' : '')
+    + (kiesbaar ? ' kaart--kiezen kaart--kiesbaar' : '') + (gekozen ? ' kaart--gekozen' : '');
   div.innerHTML = `
+    ${kiesbaar ? '<div class="kaart__vink">&#10003;</div>' : ''}
     <div class="kaart__foto">${p.foto ? `<img src="${p.foto}" alt="">` : icoonVoor(p)}</div>
     <div class="kaart__info">
       <div class="kaart__merk">${ontsnap(p.brand || p.leverancier || labelVanCat(p.hoofdcat))}</div>
@@ -2788,6 +2927,15 @@ function kaart(p) {
       <div class="aantal-bol ${op ? 'aantal-bol--op' : laag ? 'aantal-bol--laag' : ''}">${p.qty}${p.eenheid && p.eenheid !== 'stuk' ? ' <small>' + ontsnap(p.eenheid) + '</small>' : ''}</div>
       <button class="mini-min" title="1 afboeken">−</button>
     </div>`;
+  if (kiesbaar) {
+    div.addEventListener('click', () => {
+      if (ui.selectie.has(p.id)) ui.selectie.delete(p.id);
+      else ui.selectie.add(p.id);
+      tekenVoorraad();
+    });
+    return div;
+  }
+
   div.addEventListener('click', () => opendProduct(p.id));
   div.querySelector('.mini-min').addEventListener('click', async e => {
     e.stopPropagation();
@@ -2940,7 +3088,8 @@ function bindBewerkModal() {
 function tekenLijktOp() {
   const el = $('#b-lijkt-op');
   const naam = $('#b-naam').value.trim();
-  const lijst = naam.length >= 4 ? Store.gelijkaardig(naam, bewerkId || '') : [];
+  // enkel bij een nieuw product; bij bewerken heeft het geen zin
+  const lijst = (!bewerkId && naam.length >= 4) ? Store.gelijkaardig(naam) : [];
   el.hidden = !lijst.length;
   if (!lijst.length) return;
 
@@ -2995,6 +3144,7 @@ function openBewerk(pid, metCamera = false) {
   $('#b-eenheid').value = p?.eenheid || 'stuk';
   $('#b-foto').value = '';
   $('#b-verwijder').style.display = p ? '' : 'none';
+  tekenLijktOp();                      // lijst van een vorige keer opruimen
   tekenFotoVoorbeeld();
   $('#modal-bewerk').hidden = false;
   if (metCamera) $('#b-foto').click();
@@ -3450,10 +3600,12 @@ function bindInstellingen() {
     } catch (err) { melding(err.message); }
   });
 
-  $('#btn-reset-seed').addEventListener('click', async () => {
-    if (!confirm('Alles terugzetten naar de startlijst van de Cebeo-order? Je historiek gaat verloren.')) return;
-    await Store.zetStartlijst('data/seed.json');
-    melding('Startlijst teruggezet.');
+  $('#btn-wis-producten').addEventListener('click', async () => {
+    const n = Store.producten().length;
+    if (!n) return melding('Er staan al geen producten in.');
+    if (!confirm(`Alle ${n} producten en de historiek wissen?\n\nLeveranciers, minimumregels en je aanmelding blijven staan. Dit werkt ook door op je andere toestellen.`)) return;
+    await Store.wisProducten();
+    melding(`${n} producten gewist. Schone lei.`);
     toon('voorraad');
   });
 
