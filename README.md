@@ -80,6 +80,14 @@ Daarna op de telefoon: site openen in Chrome/Safari → menu → **Toevoegen aan
 
 Altijd in `localStorage` op het toestel zelf — daardoor werkt de app offline. Staat de cloud aan, dan wordt diezelfde voorraad ook automatisch naar Supabase weggeschreven en met je team gedeeld.
 
+## Aanmelden verplicht
+
+Staat de cloud aan, dan opent de app op een aanmeldscherm en is er niets te zien of te doen zonder wachtwoord. Eenmaal aangemeld blijft de sessie op het toestel staan, ook zonder internet: in een kelder zonder bereik kan Cédric gewoon blijven afboeken. Enkel wanneer Supabase de sessie écht weigert, moet hij opnieuw aanmelden.
+
+Let wel: dit is een slot op de deur, geen kluis. De bestanden van de site blijven publiek opvraagbaar — dat is bij elke website zo. Wat beveiligd is, zijn de gegevens in Supabase.
+
+Is `config.js` leeg, dan is er geen aanmeldscherm en werkt de app puur lokaal.
+
 ## Cloud aanzetten (Supabase)
 
 1. Maak een gratis project op **supabase.com**

@@ -113,24 +113,54 @@ export const Cloud = {
       gebruiker: data.user?.id,
       email: data.user?.email
     };
-    try { localStorage.setItem(SESSIE, JSON.stringify(this.sessie)); } catch {}
+    this._opslaan();
   },
 
-  /** Vorige sessie terughalen bij het opstarten van de app. */
+  /** Sessie én team lokaal bewaren, zodat de app ook zonder internet opent. */
+  _opslaan() {
+    try {
+      localStorage.setItem(SESSIE, JSON.stringify({
+        sessie: this.sessie, team: this.team, naam: this.naam
+      }));
+    } catch {}
+  },
+
+  /**
+   * Vorige sessie terughalen bij het opstarten.
+   * Zonder internet blijft de opgeslagen sessie geldig: Cédric moet in een
+   * kelder zonder bereik gewoon kunnen blijven afboeken. Enkel wanneer de
+   * server de sessie écht weigert, moet hij opnieuw aanmelden.
+   */
   async herstel() {
     if (!this.ingesteld()) return false;
+    const ruw = (() => { try { return localStorage.getItem(SESSIE); } catch { return null; } })();
+    if (!ruw) return false;
+
     try {
-      const ruw = localStorage.getItem(SESSIE);
-      if (!ruw) return false;
-      this.sessie = JSON.parse(ruw);
-      if (this.sessie.verlooptOp < Date.now() + 60000) await this.vernieuw();
-      await this.zoekTeam();
-      return true;
-    } catch (e) {
-      console.warn('sessie niet hersteld:', e);
+      const bewaard = JSON.parse(ruw);
+      // oudere versie bewaarde enkel de sessie
+      this.sessie = bewaard.sessie || bewaard;
+      this.team = bewaard.team || null;
+      this.naam = bewaard.naam || this.sessie.email || '';
+      if (!this.sessie?.refresh_token) throw new Error('geen sessie');
+    } catch {
       this.sessie = null;
+      try { localStorage.removeItem(SESSIE); } catch {}
       return false;
     }
+
+    if (this.sessie.verlooptOp < Date.now() + 60000) {
+      try {
+        await this.vernieuw();
+      } catch (e) {
+        if (/verbinding/i.test(e.message)) return true;     // offline: gewoon doorgaan
+        await this.meldAf();
+        return false;
+      }
+    }
+
+    try { await this.zoekTeam(); } catch { /* offline: laatst bekende team blijft staan */ }
+    return true;
   },
 
   /* ---------- Team ----------------------------------------- */
@@ -143,6 +173,7 @@ export const Cloud = {
     } else {
       this.team = null;
     }
+    this._opslaan();
     return this.team;
   },
 
@@ -165,6 +196,7 @@ export const Cloud = {
     });
     this.team = { id, naam };
     this.naam = mijnNaam || this.sessie.email;
+    this._opslaan();
     return this.team;
   },
 

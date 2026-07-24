@@ -60,9 +60,26 @@ const ui = {
    Start
    =========================================================== */
 
+let gestart = false;   // moet boven init() staan: start() leest hem meteen
+
 init();
 
 async function init() {
+  bindPoort();
+  // Staat de cloud aan, dan komt er niets op het scherm voor je aangemeld bent.
+  const binnen = Cloud.ingesteld() ? await Cloud.herstel() : true;
+  if (!binnen) { toonPoort(); return; }
+
+  await start();
+}
+
+/** De app zelf opstarten — pas nadat de toegang geregeld is. */
+async function start() {
+  document.body.classList.remove('vergrendeld');
+  $('#poort').hidden = true;
+  if (gestart) { tekenAlles(); return; }
+  gestart = true;
+
   await Store.init('data/seed.json');
   $('#versie').textContent = 'v' + VERSIE;
 
@@ -82,9 +99,12 @@ async function init() {
 
   if (Cloud.ingesteld()) {
     Store.bijWijziging(planSync);
-    if (await Cloud.herstel()) {
-      Store.gebruiker = Cloud.naam;
-      await haalCloudOp();
+    Store.gebruiker = Cloud.naam;
+    if (!Cloud.team) {
+      $('#team-naam').value = Cloud.naam || '';
+      $('#modal-team').hidden = false;
+    } else {
+      haalCloudOp();                    // op de achtergrond: blokkeert het scherm niet
     }
     tekenCloud();
   }
@@ -93,6 +113,43 @@ async function init() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+}
+
+/* ---------- Aanmeldpoort ---------------------------------- */
+
+function toonPoort(bericht = '') {
+  document.body.classList.add('vergrendeld');
+  $('#poort').hidden = false;
+  const fout = $('#poort-fout');
+  fout.hidden = !bericht;
+  fout.textContent = bericht;
+  setTimeout(() => $('#poort-email').focus(), 100);
+}
+
+function bindPoort() {
+  const aanmelden = async () => {
+    const knop = $('#poort-aanmelden');
+    const email = $('#poort-email').value.trim();
+    const ww = $('#poort-ww').value;
+    if (!email || !ww) return toonPoort('Vul je e-mailadres en wachtwoord in.');
+    knop.disabled = true;
+    knop.textContent = 'Bezig…';
+    try {
+      await Cloud.meldAan(email, ww);
+      $('#poort-ww').value = '';
+      $('#poort-fout').hidden = true;
+      await start();
+    } catch (e) {
+      toonPoort(e.message);
+    } finally {
+      knop.disabled = false;
+      knop.textContent = 'Aanmelden';
+    }
+  };
+
+  $('#poort-aanmelden').addEventListener('click', aanmelden);
+  $('#poort-ww').addEventListener('keydown', e => { if (e.key === 'Enter') aanmelden(); });
+  $('#poort-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('#poort-ww').focus(); });
 }
 
 function tekenAlles() {
@@ -930,28 +987,7 @@ async function haalCloudOp() {
 }
 
 function bindCloud() {
-  $('#log-annuleer').addEventListener('click', () => { $('#modal-login').hidden = true; });
   $('#team-annuleer').addEventListener('click', () => { $('#modal-team').hidden = true; });
-
-  $('#log-aanmelden').addEventListener('click', async () => {
-    const email = $('#log-email').value.trim();
-    const ww = $('#log-ww').value;
-    if (!email || !ww) return melding('Vul je e-mailadres en wachtwoord in.');
-    try {
-      await Cloud.meldAan(email, ww);
-      $('#log-ww').value = '';
-      $('#modal-login').hidden = true;
-      Store.gebruiker = Cloud.naam;
-      if (!Cloud.team) {
-        $('#team-naam').value = Cloud.naam || '';
-        $('#modal-team').hidden = false;
-      } else {
-        await haalCloudOp();
-        melding('Aangemeld als ' + Cloud.naam);
-      }
-      tekenCloud();
-    } catch (e) { melding(e.message); }
-  });
 
   $('#team-nieuw').addEventListener('click', async () => {
     try {
@@ -984,16 +1020,7 @@ function tekenCloud() {
   const knoppen = $('#cloud-knoppen');
   knoppen.innerHTML = '';
 
-  if (!Cloud.aangemeld()) {
-    $('#cloud-uitleg').textContent = 'Meld je aan om de voorraad te delen tussen toestellen en automatisch in de cloud te bewaren.';
-    status.innerHTML = '';
-    const b = document.createElement('button');
-    b.className = 'knop';
-    b.textContent = 'Aanmelden';
-    b.onclick = () => { $('#modal-login').hidden = false; };
-    knoppen.appendChild(b);
-    return;
-  }
+  if (!Cloud.aangemeld()) { paneel.hidden = true; return; }
 
   if (!Cloud.team) {
     $('#cloud-uitleg').textContent = 'Je bent aangemeld, maar er is nog geen gedeelde voorraad.';
@@ -1006,7 +1033,7 @@ function tekenCloud() {
     const af0 = document.createElement('button');
     af0.className = 'knop knop--leeg';
     af0.textContent = 'Afmelden';
-    af0.onclick = async () => { await Cloud.meldAf(); Store.gebruiker = ''; tekenCloud(); };
+    af0.onclick = async () => { await Cloud.meldAf(); Store.gebruiker = ''; toonPoort(); };
     knoppen.appendChild(af0);
     return;
   }
@@ -1041,10 +1068,10 @@ function tekenCloud() {
   af.className = 'knop knop--leeg';
   af.textContent = 'Afmelden';
   af.onclick = async () => {
+    if (!confirm('Afmelden? Je hebt je wachtwoord nodig om er weer in te komen.')) return;
     await Cloud.meldAf();
     Store.gebruiker = '';
-    tekenCloud();
-    melding('Afgemeld. De voorraad blijft op dit toestel staan.');
+    toonPoort();
   };
   knoppen.appendChild(af);
 }

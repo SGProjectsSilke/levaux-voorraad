@@ -44,6 +44,43 @@ body { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px)); }
 button, input, select, textarea { font-family: inherit; font-size: 1rem; }
 button { cursor: pointer; border: none; background: none; color: inherit; }
 
+/* ---------- Aanmeldpoort ----------------------------------- */
+
+body.vergrendeld { overflow: hidden; }
+body.vergrendeld > *:not(.poort) { display: none !important; }
+
+.poort {
+  position: fixed; inset: 0; z-index: 100;
+  background: var(--zwart);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+.poort__kaart {
+  width: 100%; max-width: 360px;
+  background: var(--wit);
+  border-radius: 18px;
+  padding: 28px 22px 24px;
+  box-shadow: var(--schaduw-op);
+  border-top: 5px solid var(--rood);
+  text-align: left;
+}
+.poort__logo { width: 66px; height: 66px; display: block; margin: 0 auto 12px; object-fit: contain; }
+.poort__kaart h1 {
+  margin: 0; text-align: center;
+  font-size: 1.15rem; letter-spacing: .05em; text-transform: uppercase;
+}
+.poort__onder {
+  margin: 3px 0 22px; text-align: center;
+  font-size: .7rem; letter-spacing: .13em; text-transform: uppercase; color: var(--grijs-400);
+}
+.poort__fout {
+  background: var(--rood-licht); color: var(--rood-donker);
+  border-radius: var(--radius-s); padding: 10px 12px;
+  font-size: .82rem; line-height: 1.4; margin-bottom: 12px;
+}
+.poort__hulp { margin: 14px 0 0; font-size: .73rem; color: var(--grijs-600); text-align: center; line-height: 1.5; }
+
 /* ---------- Header ---------------------------------------- */
 
 .app-header {
