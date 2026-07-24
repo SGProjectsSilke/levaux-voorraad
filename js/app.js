@@ -2,8 +2,8 @@
    app.js — schermen en interactie
    =========================================================== */
 
-import { Store, VERSIE, normRef, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat } from './store.js';
-import { leesAfbeeldingen, parseer } from './ocr.js';
+import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat } from './store.js';
+import { leesAfbeeldingen, parseer, haalFotos, haalOrdernummer } from './ocr.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -48,7 +48,9 @@ const ui = {
   lev: '',
   productId: null,
   importRegels: [],
-  importLabel: 'Cebeo-order'
+  importLabel: 'Order',
+  importLev: 'Cebeo',
+  importFotos: new Map()
 };
 
 /* ===========================================================
@@ -85,6 +87,7 @@ function tekenAlles() {
   tekenBestellen();
   tekenHistoriek();
   tekenLeveranciers();
+  tekenImportKeuze();
   tekenBadge();
   tekenOpslag();
 }
@@ -131,7 +134,20 @@ function toon(naam) {
    =========================================================== */
 
 function bindVoorraad() {
-  $('#zoek').addEventListener('input', e => { ui.zoek = e.target.value; tekenVoorraad(); });
+  const veld = $('#zoek');
+  const wis = $('#zoek-wis');
+  const bijWijziging = () => {
+    ui.zoek = veld.value;
+    wis.hidden = !veld.value;
+    tekenVoorraad();
+  };
+  veld.addEventListener('input', bijWijziging);
+  veld.addEventListener('search', bijWijziging);          // kruisje van iOS
+  wis.addEventListener('click', () => {
+    veld.value = '';
+    bijWijziging();
+    veld.focus();
+  });
 }
 
 function chip(label, waarde, huidig, opKlik) {
@@ -422,6 +438,11 @@ function verkleinFoto(bestand) {
    =========================================================== */
 
 function bindInboeken() {
+  $('#import-lev').addEventListener('change', e => {
+    ui.importLev = e.target.value;
+    toonImportHulp();
+  });
+
   $('#ocr-bestanden').addEventListener('change', async e => {
     const bestanden = [...e.target.files];
     e.target.value = '';
@@ -433,14 +454,18 @@ function bindInboeken() {
       $('#ocr-status').textContent = tekst;
     };
 
+    const formaat = Store.formaatVanLeverancier(ui.importLev);
     try {
-      const tekst = await leesAfbeeldingen(bestanden, zetVoortgang);
-      const regels = parseer(tekst);
+      const { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang, { formaat });
+      let regels = parseer(tekst, formaat);
       $('#ocr-voortgang').hidden = true;
       if (!regels.length) {
-        return melding('Geen productregels herkend. Probeer scherpere afbeeldingen of plak de tekst.');
+        return melding('Geen productregels herkend. Klopt de leverancier hierboven? Anders kan je de tekst plakken.');
       }
-      ui.importLabel = `Cebeo-order ${new Date().toLocaleDateString('nl-BE')}`;
+      // productfoto's uit de kaartjes knippen (enkel de Cebeo-opmaak heeft die)
+      ui.importFotos = formaat === 'cebeo' ? haalFotos(paginas) : new Map();
+      const nr = haalOrdernummer(tekst);
+      ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
       toonControle(regels);
     } catch (err) {
       $('#ocr-voortgang').hidden = true;
@@ -449,9 +474,12 @@ function bindInboeken() {
   });
 
   $('#btn-plak').addEventListener('click', () => {
-    const regels = parseer($('#plak-tekst').value);
-    if (!regels.length) return melding('Geen regels herkend. Staat er "Ref Cebeo …" in de tekst?');
-    ui.importLabel = `Cebeo-order ${new Date().toLocaleDateString('nl-BE')}`;
+    const tekst = $('#plak-tekst').value;
+    const regels = parseer(tekst, Store.formaatVanLeverancier(ui.importLev));
+    if (!regels.length) return melding('Geen regels herkend in die tekst.');
+    ui.importFotos = new Map();
+    const nr = haalOrdernummer(tekst);
+    ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
     toonControle(regels);
   });
 
@@ -465,24 +493,30 @@ function toonControle(regels) {
   ui.importRegels = regels;
   const el = $('#controle-regels');
   el.innerHTML = '';
+  // fotokolom enkel tonen als er effectief foto's zijn (tabellen hebben er geen)
+  const heeftFotos = regels.some(r => ui.importFotos.get(fuzzKey(r.ref)) || Store.viaRefBijna(r.ref)?.product?.foto);
+  el.classList.toggle('met-fotos', heeftFotos);
 
+  const metFoto = regels.filter(r => ui.importFotos.get(fuzzKey(r.ref))).length;
   const onzeker = regels.filter(r => !r.zeker || !r.qty).length;
   const w = $('#controle-waarschuwing');
   w.classList.toggle('waarschuwing--ok', onzeker === 0);
   w.innerHTML = onzeker
     ? `<b>${onzeker}</b> van de ${regels.length} regels zijn niet zeker gelezen — ze staan in het rood. Vul het juiste aantal in; regels op 0 worden overgeslagen.`
-    : `${regels.length} regels herkend. Kijk ze snel na — daarna worden ze bij je voorraad geteld.`;
+    : `${regels.length} regels herkend${metFoto ? `, met ${metFoto} productfoto${metFoto === 1 ? '' : "'s"}` : ''}. Kijk ze snel na — daarna worden ze bij je voorraad geteld.`;
 
   regels.forEach((r, i) => {
     const treffer = Store.viaRefBijna(r.ref);
     const bestaand = treffer?.product || null;
     r.bestaandId = bestaand?.id || null;
     if (treffer && !treffer.exact) r.ref = bestaand.ref;   // leesfout in de referentie rechtzetten
+    r.foto = ui.importFotos.get(fuzzKey(r.ref)) || '';
 
     const twijfel = !r.zeker || !r.qty;
     const div = document.createElement('div');
     div.className = 'regel' + (bestaand ? '' : ' regel--nieuw') + (twijfel ? ' regel--twijfel' : '');
     div.innerHTML = `
+      ${heeftFotos ? `<div class="regel__foto">${r.foto ? `<img src="${r.foto}" alt="">` : (bestaand?.foto ? `<img src="${bestaand.foto}" alt="">` : '')}</div>` : ''}
       <div style="min-width:0">
         <div class="regel__label ${bestaand ? 'regel__label--bestaat' : 'regel__label--nieuw'}">
           ${bestaand ? `bijtellen bij ${bestaand.qty}` : 'nieuw product'} · ref ${ontsnap(r.ref)}${treffer && !treffer.exact ? ' (verbeterd)' : ''}
@@ -519,7 +553,7 @@ function toonControle(regels) {
 async function bevestigImport() {
   const regels = ui.importRegels.filter(r => r.qty > 0);
   if (!regels.length) return melding('Er staat niets meer in de lijst.');
-  const { bij, nieuw } = await Store.boekOrderIn(regels, ui.importLabel, 'Cebeo');
+  const { bij, nieuw } = await Store.boekOrderIn(regels, ui.importLabel, ui.importLev);
   ui.importRegels = [];
   $('#plak-tekst').value = '';
   toon('voorraad');
@@ -648,7 +682,7 @@ function bindInstellingen() {
   $('#btn-lev-toevoegen').addEventListener('click', async () => {
     const n = $('#nieuwe-lev').value.trim();
     if (!n) return;
-    await Store.voegLeverancierToe(n, $('#nieuwe-lev-cat').value);
+    await Store.voegLeverancierToe(n, $('#nieuwe-lev-cat').value, 'tabel');
     $('#nieuwe-lev').value = '';
     melding('Leverancier toegevoegd.');
   });
@@ -694,6 +728,22 @@ function tekenOpslag() {
     <div class="veld__hulp" style="margin:0">Opslag op dit toestel: ${pct < 1 ? 'minder dan 1' : pct}% gebruikt${pct > 80 ? ' — tijd voor een back-up en minder foto’s.' : '.'}</div>`;
 }
 
+function tekenImportKeuze() {
+  const sel = $('#import-lev');
+  if (!sel) return;
+  const namen = Store.leveranciers().map(l => l.naam);
+  if (!namen.includes(ui.importLev)) ui.importLev = namen[0] || '';
+  sel.innerHTML = namen.map(n => `<option${n === ui.importLev ? ' selected' : ''}>${ontsnap(n)}</option>`).join('');
+  toonImportHulp();
+}
+
+function toonImportHulp() {
+  const l = Store.leverancier(ui.importLev);
+  $('#import-lev-hulp').textContent = l?.formaat === 'cebeo'
+    ? 'Kaartjes met "Ref Cebeo" — de app haalt hier ook de productfoto\'s uit.'
+    : 'Tabel met artikelnummer, aantal en prijs naast elkaar.';
+}
+
 function tekenLeveranciers() {
   const el = $('#lev-lijst');
   if (!el) return;
@@ -707,12 +757,18 @@ function tekenLeveranciers() {
       <select data-lev-cat="${ontsnap(l.naam)}">
         ${HOOFDCATEGORIEEN.map(c => `<option value="${c.key}"${c.key === l.cat ? ' selected' : ''}>${c.label}</option>`).join('')}
       </select>
+      <select data-lev-formaat="${ontsnap(l.naam)}" class="beheerrij__formaat">
+        <option value="cebeo"${l.formaat === 'cebeo' ? ' selected' : ''}>Kaartjes (Cebeo-app)</option>
+        <option value="tabel"${l.formaat !== 'cebeo' ? ' selected' : ''}>Tabel</option>
+      </select>
       <button class="beheerrij__weg" data-lev-weg="${ontsnap(l.naam)}" title="${n ? n + ' product(en) — eerst verplaatsen' : 'Verwijderen'}"${n ? ' data-vast="1"' : ''}>×</button>
       <small>${n ? n + (n === 1 ? ' product' : ' producten') : 'nog niet gebruikt'}</small>
     </div>`;
   }).join('') || '<div class="veld__hulp">Nog geen leveranciers.</div>';
 
   el.onchange = async e => {
+    const fmt = e.target.dataset.levFormaat;
+    if (fmt) { await Store.zetLeverancierFormaat(fmt, e.target.value); melding('Soort orderlijst aangepast.'); return; }
     const cat = e.target.dataset.levCat;
     if (cat) { await Store.zetLeverancierCat(cat, e.target.value); melding('Standaardcategorie aangepast.'); return; }
     const oud = e.target.dataset.levNaam;

@@ -10,8 +10,8 @@
    =========================================================== */
 
 const SLEUTEL = 'levaux.voorraad.v1';
-export const VERSIE = '1.1.0';
-const DATAVERSIE = 2;
+export const VERSIE = '1.3.0';
+const DATAVERSIE = 3;
 
 /** De vier hoofdcategorieën waarin Cédric zijn materiaal opdeelt. */
 export const HOOFDCATEGORIEEN = [
@@ -134,7 +134,13 @@ function legeStaat() {
     // Per leverancier onthouden we in welke hoofdcategorie zijn materiaal
     // meestal valt. Alles van Cebeo is elektra, dus dat hoeft Cédric
     // nooit meer aan te duiden — hij kan het per product wel wijzigen.
-    leveranciers: [{ naam: 'Cebeo', cat: 'elektra' }],
+    // formaat = hoe hun orderlijst eruitziet:
+    //   'cebeo' = kaartjes met "Ref Cebeo" (de Cebeo-app)
+    //   'tabel' = artikelnummer | naam | aantal | prijs (de meeste anderen)
+    leveranciers: [
+      { naam: 'Cebeo', cat: 'elektra', formaat: 'cebeo' },
+      { naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' }
+    ],
     orders: [],
     instellingen: {}
   };
@@ -142,7 +148,7 @@ function legeStaat() {
 
 /** Oudere opgeslagen gegevens bijwerken naar het huidige model. */
 function migreer(staat) {
-  if (!staat.leveranciers) staat.leveranciers = [{ naam: 'Cebeo', cat: 'elektra' }];
+  if (!staat.leveranciers) staat.leveranciers = [{ naam: 'Cebeo', cat: 'elektra', formaat: 'cebeo' }];
   if ((staat.versie || 1) < 2) {
     staat.producten.forEach(p => {
       if (!p.hoofdcat) p.hoofdcat = 'elektra';        // alles tot nu toe kwam van Cebeo
@@ -150,6 +156,15 @@ function migreer(staat) {
       if (!p.eenheid) p.eenheid = 'stuk';
     });
     staat.versie = 2;
+  }
+  if (staat.versie < 3) {
+    staat.leveranciers.forEach(l => {
+      if (!l.formaat) l.formaat = /cebeo/i.test(l.naam) ? 'cebeo' : 'tabel';
+    });
+    if (!staat.leveranciers.some(l => /EMZ/i.test(l.naam))) {
+      staat.leveranciers.push({ naam: 'EMZ Maarten Paulissen', cat: 'sanitair', formaat: 'tabel' });
+    }
+    staat.versie = 3;
   }
   return staat;
 }
@@ -359,12 +374,14 @@ export const Store = {
         bestaand.qty += aantal;
         bestaand.gewijzigd = order.ts;
         if (r.price) bestaand.price = Number(r.price);
+        // foto uit de screenshot, maar nooit een zelf genomen foto overschrijven
+        if (r.foto && !bestaand.foto) bestaand.foto = r.foto;
         this._log(bestaand, aantal, 'order', { orderId: order.id, note: label });
         bij++;
       } else {
         const p = await this.voegProductToe({
           ref: r.ref, brand: r.brand, name: r.name, qty: 0,
-          price: r.price, min: r.min ?? 0, cat: r.cat || '',
+          price: r.price, min: r.min ?? 0, cat: r.cat || '', foto: r.foto || '',
           leverancier, hoofdcat: this.catVanLeverancier(leverancier)
         });
         p.qty = aantal;
@@ -391,11 +408,24 @@ export const Store = {
     return this.staat.leveranciers.find(l => l.naam.toLowerCase() === String(naam).toLowerCase())?.cat || 'materialen';
   },
 
-  async voegLeverancierToe(naam, cat = 'materialen') {
+  async voegLeverancierToe(naam, cat = 'materialen', formaat = 'tabel') {
     const n = String(naam || '').trim();
     if (!n || this.staat.leveranciers.some(l => l.naam.toLowerCase() === n.toLowerCase())) return;
-    this.staat.leveranciers.push({ naam: n, cat });
+    this.staat.leveranciers.push({ naam: n, cat, formaat });
     await this.bewaar();
+  },
+
+  leverancier(naam) {
+    return this.staat.leveranciers.find(l => l.naam.toLowerCase() === String(naam).toLowerCase());
+  },
+
+  formaatVanLeverancier(naam) {
+    return this.leverancier(naam)?.formaat || 'tabel';
+  },
+
+  async zetLeverancierFormaat(naam, formaat) {
+    const l = this.leverancier(naam);
+    if (l) { l.formaat = formaat; await this.bewaar(); }
   },
 
   async zetLeverancierCat(naam, cat) {

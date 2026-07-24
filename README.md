@@ -7,7 +7,9 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Leveranciers** — filter per leverancier; elke leverancier heeft een standaardcategorie (Cebeo → Elektra)
 - **Afboeken** — één tik op de min-knop, of een aantal ingeven in het productscherm
 - **Bijbestellen vanaf** — het minimum per product staat in het productscherm zelf, zodat je het instelt op het moment dat je de voorraad ziet
-- **Inboeken** — Cebeo-order inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
+- **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
+- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs (EMZ en de meeste andere leveranciers). Je kiest de leverancier bij het inlezen; het soort lijst staat per leverancier ingesteld
+- **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
 - **Eigen materiaal** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
 - **Eenheden** — stuk, m, m², zak, pallet, rol, kg, doos, liter
 - **Bijbestellen** — alles onder het ingestelde minimum, gegroepeerd per leverancier, klaar om te kopiëren of te mailen
@@ -83,6 +85,12 @@ Voorlopig in `localStorage` van de browser op het toestel zelf. Dat betekent:
 - browsergegevens wissen = voorraad weg → **maak regelmatig een back-up** via Instellingen
 
 `js/store.js` praat via een adapter met de opslag. Om naar de cloud te gaan (sync tussen telefoon en laptop, back-up, meerdere gebruikers) hoef je enkel een `CloudAdapter` te schrijven met dezelfde `laden()` en `bewaren()`, en die in `kiesAdapter()` te zetten. De rest van de app blijft ongewijzigd.
+
+## Over de twee soorten orderlijsten
+
+Tekstherkenning leest een tabel kolom per kolom als je haar haar gang laat gaan: eerst alle artikelnummers, dan alle namen, dan alle aantallen. Daarmee valt niet meer te achterhalen welk aantal bij welke regel hoort. Daarom zet de app de herkenning in "één blok"-modus (`tessedit_pageseg_mode = 6`) zodra de leverancier op **tabel** staat. Voor de Cebeo-kaartjes werkt de automatische modus juist beter.
+
+Dat is de reden dat elke leverancier een veld `formaat` heeft. Klopt de herkenning niet, dan is dat het eerste om te controleren.
 
 ## Over de tekstherkenning
 

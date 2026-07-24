@@ -30,7 +30,10 @@
   </div>
 
   <div class="zoekbalk" id="zoekbalk">
-    <input type="search" id="zoek" placeholder="Zoek op naam, merk, referentie of leverancier…" autocomplete="off" enterkeyhint="search">
+    <div class="zoekveld">
+      <input type="search" id="zoek" placeholder="Zoek op naam, merk, referentie of leverancier…" autocomplete="off" enterkeyhint="search">
+      <button id="zoek-wis" class="zoekveld__wis" type="button" aria-label="Zoekopdracht wissen" hidden>&times;</button>
+    </div>
   </div>
   <div class="chips" id="chips"></div>
   <div class="chips chips--tweede" id="chips-lev"></div>
@@ -52,8 +55,13 @@
   <!-- ============ INBOEKEN ============ -->
   <section class="scherm" id="scherm-inboeken" hidden>
     <div class="paneel">
-      <h3>Cebeo-order inlezen</h3>
-      <p>Maak schermafbeeldingen van je order in de Cebeo-app en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe worden toegevoegd.</p>
+      <h3>Order inlezen</h3>
+      <p>Maak schermafbeeldingen van je order en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe worden toegevoegd.</p>
+      <div class="veld">
+        <label for="import-lev">Van welke leverancier?</label>
+        <select id="import-lev"></select>
+        <div class="veld__hulp" id="import-lev-hulp"></div>
+      </div>
       <label class="dropzone" for="ocr-bestanden">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <strong>Schermafbeeldingen kiezen</strong>
@@ -120,7 +128,7 @@
   <section class="scherm" id="scherm-instellingen" hidden>
     <div class="paneel">
       <h3>Leveranciers</h3>
-      <p>Bij elke leverancier hoort een standaardcategorie. Voeg je een product van Cebeo toe, dan staat Elektra dus al goed.</p>
+      <p>Bij elke leverancier hoort een standaardcategorie en het soort orderlijst. <strong>Kaartjes</strong> is de Cebeo-app; <strong>tabel</strong> is een lijst met artikelnummer, aantal en prijs naast elkaar.</p>
       <div id="lev-lijst"></div>
       <div class="veld" style="margin:12px 0 8px">
         <input type="text" id="nieuwe-lev" placeholder="Naam nieuwe leverancier">
