@@ -646,12 +646,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   <section class="scherm" id="scherm-inboeken" hidden>
     <div class="paneel">
       <h3>Bestelbon inlezen</h3>
-      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
-      <div class="veld">
-        <label for="import-lev">Van welke leverancier?</label>
-        <select id="import-lev"></select>
-        <div class="veld__hulp" id="import-lev-hulp"></div>
-      </div>
+      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. De app zoekt zelf uit van welke leverancier de bon komt. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
       <label class="dropzone" for="ocr-bestanden">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <strong>Schermafbeeldingen kiezen</strong>
@@ -686,6 +681,20 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     <div class="waarschuwing" id="controle-waarschuwing">
       Kijk de regels na voor je ze bevestigt. Ingelezen tekst is niet altijd perfect.
     </div>
+    <div class="paneel" id="controle-lev-paneel">
+      <div class="veld" style="margin:0">
+        <label for="controle-lev">Leverancier</label>
+        <select id="controle-lev"></select>
+        <div class="veld__hulp" id="controle-lev-hulp"></div>
+      </div>
+      <div id="controle-lev-nieuw" hidden style="margin-top:12px">
+        <div class="veld"><label for="controle-lev-naam">Naam van de leverancier</label>
+          <input type="text" id="controle-lev-naam"></div>
+        <div class="veld" style="margin-bottom:0"><label for="controle-lev-cat">Categorie voor zijn materiaal</label>
+          <select id="controle-lev-cat"></select></div>
+      </div>
+    </div>
+
     <div id="controle-regels"></div>
     <div class="knoppen" style="margin-top:14px">
       <button class="knop" id="btn-bevestig-import">Toevoegen aan voorraad</button>
@@ -1866,6 +1875,31 @@ async function leesAfbeeldingen(bestanden, opVoortgang = () => {}, opties = {}) 
   return { tekst: paginas.map(p => p.tekst).join('\n'), paginas };
 }
 
+/**
+ * Leest dezelfde afbeeldingen opnieuw in een andere leesmodus. Wordt
+ * gebruikt als blijkt dat de bon een tabel is in plaats van kaartjes:
+ * een tabel moet in "één blok"-modus gelezen worden, anders leest de
+ * herkenning kolom per kolom en horen de aantallen bij de verkeerde regel.
+ */
+async function herlees(paginas, formaat, opVoortgang = () => {}) {
+  const T = await laadTesseract();
+  const worker = await T.createWorker('nld', 1, {
+    logger: m => { if (m.status === 'recognizing text') opVoortgang(10 + m.progress * 85, 'Opnieuw lezen…'); }
+  });
+  await worker.setParameters({ tessedit_pageseg_mode: formaat === 'tabel' ? '6' : '3' });
+  try {
+    for (let i = 0; i < paginas.length; i++) {
+      opVoortgang(10 + (i / paginas.length) * 85, `Opnieuw lezen ${i + 1} van ${paginas.length}…`);
+      const { data } = await worker.recognize(paginas[i].canvas, {}, { text: true, blocks: true });
+      paginas[i].tekst = data.text || '';
+      paginas[i].woorden = haalWoorden(data);
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return { tekst: paginas.map(p => p.tekst).join('\n'), paginas };
+}
+
 /** Plat lijstje van alle herkende woorden met hun positie. */
 function haalWoorden(data) {
   const uit = [];
@@ -2071,6 +2105,49 @@ function parseerTabel(tekst) {
   return voegSamen(regels);
 }
 
+/**
+ * Wie heeft deze bon gestuurd? Eerst kijken of het een Cebeo-kaartjeslijst
+ * is, dan of er een bekende leverancier in de tekst staat, en anders de
+ * naam boven het ordernummer gebruiken als voorstel.
+ * @returns {{naam:string, zeker:boolean, formaat:'cebeo'|'tabel'}}
+ */
+function raadLeverancier(tekst, bekende = []) {
+  const t = String(tekst || '');
+  if (/ref\s*[c(]eb/i.test(t)) {
+    const cebeo = bekende.find(l => /cebeo/i.test(l.naam));
+    return { naam: cebeo?.naam || 'Cebeo', zeker: true, formaat: 'cebeo' };
+  }
+
+  const klein = t.toLowerCase();
+  for (const l of bekende) {
+    const n = l.naam.toLowerCase();
+    // ook op het eerste, meest kenmerkende woord matchen ("EMZ")
+    const eerste = n.split(/\s+/)[0];
+    if (klein.includes(n) || (eerste.length >= 3 && klein.includes(eerste))) {
+      return { naam: l.naam, zeker: true, formaat: l.formaat || 'tabel' };
+    }
+  }
+
+  // "EMZ Maarten Paulissen Ordernummer: 24768"
+  const m = t.match(/([A-ZÀ-Þ][\wÀ-ÿ&.'-]*(?:[ ][A-ZÀ-Þ][\wÀ-ÿ&.'-]*){0,3})\s+(?:ordernummer|orderbevestiging|leveringsbon|bestelbon|factuur)/i);
+  if (m) return { naam: poetsBedrijf(m[1]), zeker: false, formaat: 'tabel' };
+
+  // anders: de eerste zinnige regel
+  const regel = t.split('\n').map(r => r.trim())
+    .find(r => r.length > 3 && /[A-Za-zÀ-ÿ]{3}/.test(r) && !/^\d/.test(r));
+  return { naam: (regel || '').slice(0, 40).replace(/[^\wÀ-ÿ&.' -]/g, '').trim(), zeker: false, formaat: 'tabel' };
+}
+
+/** "Van Marcke Orderbevestiging" → "Van Marcke": woorden als
+    orderbevestiging of leveringsbon horen niet bij de bedrijfsnaam. */
+function poetsBedrijf(naam) {
+  const papier = /^(order(bevestiging|nummer)?|bestel(bon|ling)?|leveringsbon|leverbon|factuur|offerte|nota|bon|document|klant|datum)$/i;
+  const woorden = String(naam).trim().split(/\s+/);
+  while (woorden.length > 1 && papier.test(woorden[woorden.length - 1])) woorden.pop();
+  while (woorden.length > 1 && papier.test(woorden[0])) woorden.shift();
+  return woorden.join(' ');
+}
+
 /** Ordernummer uit de kop van een tabel, voor het label van de order. */
 function haalOrdernummer(tekst) {
   const m = String(tekst || '').match(/ordernummer\s*[:\s]\s*([A-Z0-9\-]{3,})/i);
@@ -2228,6 +2305,8 @@ const ui = {
   importRegels: [],
   importLabel: 'Order',
   importLev: 'Cebeo',
+  importLevNieuw: false,
+  importFormaat: 'cebeo',
   importFotos: new Map()
 };
 
@@ -2275,7 +2354,6 @@ function tekenAlles() {
   tekenBestellen();
   tekenHistoriek();
   tekenLeveranciers();
-  tekenImportKeuze();
   tekenBadge();
   tekenOpslag();
 }
@@ -2631,11 +2709,6 @@ function verkleinFoto(bestand) {
    =========================================================== */
 
 function bindInboeken() {
-  $('#import-lev').addEventListener('change', e => {
-    ui.importLev = e.target.value;
-    toonImportHulp();
-  });
-
   $('#ocr-bestanden').addEventListener('change', async e => {
     const bestanden = [...e.target.files];
     e.target.value = '';
@@ -2647,18 +2720,34 @@ function bindInboeken() {
       $('#ocr-status').textContent = tekst;
     };
 
-    const formaat = Store.formaatVanLeverancier(ui.importLev);
     try {
-      const { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang, { formaat });
-      let regels = parseer(tekst, formaat);
+      // Eerste poging: gewone leesmodus. Die is het beste voor de
+      // kaartjeslijst van Cebeo.
+      let { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang);
+      let formaat = 'cebeo';
+      let regels = parseerKaarten(tekst);
+
+      if (!regels.length) {
+        // Geen kaartjes gevonden → het is een tabel, en die moet in
+        // "één blok"-modus gelezen worden.
+        zetVoortgang(8, 'Andere opmaak — even opnieuw lezen…');
+        ({ tekst, paginas } = await herlees(paginas, 'tabel', zetVoortgang));
+        formaat = 'tabel';
+        regels = parseerTabel(tekst);
+      }
+
       $('#ocr-voortgang').hidden = true;
       if (!regels.length) {
-        return melding('Geen productregels herkend. Klopt de leverancier hierboven? Anders kan je de tekst plakken.');
+        return melding('Geen productregels herkend. Probeer scherpere afbeeldingen, of plak de tekst.');
       }
-      // productfoto's uit de kaartjes knippen (enkel de Cebeo-opmaak heeft die)
+
+      const geraden = raadLeverancier(tekst, Store.leveranciers());
+      ui.importLev = geraden.naam;
+      ui.importLevNieuw = !Store.leverancier(geraden.naam);
+      ui.importFormaat = formaat;
       ui.importFotos = formaat === 'cebeo' ? haalFotos(paginas) : new Map();
       const nr = haalOrdernummer(tekst);
-      ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
+      ui.importLabel = `${geraden.naam} ${nr || new Date().toLocaleDateString('nl-BE')}`;
       toonControle(regels);
     } catch (err) {
       $('#ocr-voortgang').hidden = true;
@@ -2668,13 +2757,26 @@ function bindInboeken() {
 
   $('#btn-plak').addEventListener('click', () => {
     const tekst = $('#plak-tekst').value;
-    const regels = parseer(tekst, Store.formaatVanLeverancier(ui.importLev));
+    const kaarten = parseerKaarten(tekst);
+    const regels = kaarten.length ? kaarten : parseerTabel(tekst);
     if (!regels.length) return melding('Geen regels herkend in die tekst.');
+    const geraden = raadLeverancier(tekst, Store.leveranciers());
+    ui.importLev = geraden.naam;
+    ui.importLevNieuw = !Store.leverancier(geraden.naam);
+    ui.importFormaat = kaarten.length ? 'cebeo' : 'tabel';
     ui.importFotos = new Map();
     const nr = haalOrdernummer(tekst);
-    ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
+    ui.importLabel = `${geraden.naam} ${nr || new Date().toLocaleDateString('nl-BE')}`;
     toonControle(regels);
   });
+
+  // leverancier op het controlescherm
+  $('#controle-lev').addEventListener('change', e => {
+    ui.importLevNieuw = e.target.value === '__nieuw';
+    if (!ui.importLevNieuw) ui.importLev = e.target.value;
+    tekenControleLev();
+  });
+  $('#controle-lev-naam').addEventListener('input', e => { ui.importLev = e.target.value.trim(); });
 
   $('#btn-nieuw-product').addEventListener('click', () => openBewerk(null));
   $('#btn-nieuw-foto').addEventListener('click', () => openBewerk(null, true));
@@ -2682,8 +2784,27 @@ function bindInboeken() {
   $('#btn-annuleer-import').addEventListener('click', () => { ui.importRegels = []; toon('inboeken'); });
 }
 
+function tekenControleLev() {
+  const sel = $('#controle-lev');
+  const bekend = Store.leveranciers().map(l => l.naam);
+  const opties = bekend.map(n =>
+    `<option${!ui.importLevNieuw && n === ui.importLev ? ' selected' : ''}>${ontsnap(n)}</option>`).join('');
+  sel.innerHTML = opties + `<option value="__nieuw"${ui.importLevNieuw ? ' selected' : ''}>+ Nieuwe leverancier toevoegen…</option>`;
+
+  $('#controle-lev-nieuw').hidden = !ui.importLevNieuw;
+  if (ui.importLevNieuw) {
+    if (!$('#controle-lev-naam').value) $('#controle-lev-naam').value = ui.importLev;
+    $('#controle-lev-cat').innerHTML = HOOFDCATEGORIEEN.map(c =>
+      `<option value="${c.key}">${c.label}</option>`).join('');
+    $('#controle-lev-hulp').textContent = 'Deze leverancier kende de app nog niet. Kijk de naam na en kies waar zijn materiaal onder valt.';
+  } else {
+    $('#controle-lev-hulp').textContent = 'Herkend op de bon. Klopt het niet, kies dan hier de juiste.';
+  }
+}
+
 function toonControle(regels) {
   ui.importRegels = regels;
+  tekenControleLev();
   const el = $('#controle-regels');
   el.innerHTML = '';
   // fotokolom enkel tonen als er effectief foto's zijn (tabellen hebben er geen)
@@ -2746,6 +2867,15 @@ function toonControle(regels) {
 async function bevestigImport() {
   const regels = ui.importRegels.filter(r => r.qty > 0);
   if (!regels.length) return melding('Er staat niets meer in de lijst.');
+
+  if (ui.importLevNieuw) {
+    const naam = $('#controle-lev-naam').value.trim();
+    if (!naam) return melding('Geef de leverancier een naam.');
+    await Store.voegLeverancierToe(naam, $('#controle-lev-cat').value, ui.importFormaat);
+    ui.importLev = naam;
+    ui.importLevNieuw = false;
+  }
+
   const { bij, nieuw } = await Store.boekOrderIn(regels, ui.importLabel, ui.importLev);
   ui.importRegels = [];
   $('#plak-tekst').value = '';
@@ -2966,22 +3096,6 @@ function tekenOpslag() {
   const pct = Store.opslagGebruik();
   el.innerHTML = `<div class="balk" style="margin:0 0 6px"><i style="width:${Math.max(pct, 1)}%;background:${pct > 80 ? 'var(--rood)' : 'var(--zwart)'}"></i></div>
     <div class="veld__hulp" style="margin:0">Opslag op dit toestel: ${pct < 1 ? 'minder dan 1' : pct}% gebruikt${pct > 80 ? ' — tijd voor een back-up en minder foto’s.' : '.'}</div>`;
-}
-
-function tekenImportKeuze() {
-  const sel = $('#import-lev');
-  if (!sel) return;
-  const namen = Store.leveranciers().map(l => l.naam);
-  if (!namen.includes(ui.importLev)) ui.importLev = namen[0] || '';
-  sel.innerHTML = namen.map(n => `<option${n === ui.importLev ? ' selected' : ''}>${ontsnap(n)}</option>`).join('');
-  toonImportHulp();
-}
-
-function toonImportHulp() {
-  const l = Store.leverancier(ui.importLev);
-  $('#import-lev-hulp').textContent = l?.formaat === 'cebeo'
-    ? 'Kaartjes met "Ref Cebeo" — de app haalt hier ook de productfoto\'s uit.'
-    : 'Tabel met artikelnummer, aantal en prijs naast elkaar.';
 }
 
 function tekenLeveranciers() {

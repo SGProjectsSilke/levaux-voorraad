@@ -86,6 +86,31 @@ export async function leesAfbeeldingen(bestanden, opVoortgang = () => {}, opties
   return { tekst: paginas.map(p => p.tekst).join('\n'), paginas };
 }
 
+/**
+ * Leest dezelfde afbeeldingen opnieuw in een andere leesmodus. Wordt
+ * gebruikt als blijkt dat de bon een tabel is in plaats van kaartjes:
+ * een tabel moet in "één blok"-modus gelezen worden, anders leest de
+ * herkenning kolom per kolom en horen de aantallen bij de verkeerde regel.
+ */
+export async function herlees(paginas, formaat, opVoortgang = () => {}) {
+  const T = await laadTesseract();
+  const worker = await T.createWorker('nld', 1, {
+    logger: m => { if (m.status === 'recognizing text') opVoortgang(10 + m.progress * 85, 'Opnieuw lezen…'); }
+  });
+  await worker.setParameters({ tessedit_pageseg_mode: formaat === 'tabel' ? '6' : '3' });
+  try {
+    for (let i = 0; i < paginas.length; i++) {
+      opVoortgang(10 + (i / paginas.length) * 85, `Opnieuw lezen ${i + 1} van ${paginas.length}…`);
+      const { data } = await worker.recognize(paginas[i].canvas, {}, { text: true, blocks: true });
+      paginas[i].tekst = data.text || '';
+      paginas[i].woorden = haalWoorden(data);
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return { tekst: paginas.map(p => p.tekst).join('\n'), paginas };
+}
+
 /** Plat lijstje van alle herkende woorden met hun positie. */
 function haalWoorden(data) {
   const uit = [];
@@ -289,6 +314,49 @@ export function parseerTabel(tekst) {
     }
   }
   return voegSamen(regels);
+}
+
+/**
+ * Wie heeft deze bon gestuurd? Eerst kijken of het een Cebeo-kaartjeslijst
+ * is, dan of er een bekende leverancier in de tekst staat, en anders de
+ * naam boven het ordernummer gebruiken als voorstel.
+ * @returns {{naam:string, zeker:boolean, formaat:'cebeo'|'tabel'}}
+ */
+export function raadLeverancier(tekst, bekende = []) {
+  const t = String(tekst || '');
+  if (/ref\s*[c(]eb/i.test(t)) {
+    const cebeo = bekende.find(l => /cebeo/i.test(l.naam));
+    return { naam: cebeo?.naam || 'Cebeo', zeker: true, formaat: 'cebeo' };
+  }
+
+  const klein = t.toLowerCase();
+  for (const l of bekende) {
+    const n = l.naam.toLowerCase();
+    // ook op het eerste, meest kenmerkende woord matchen ("EMZ")
+    const eerste = n.split(/\s+/)[0];
+    if (klein.includes(n) || (eerste.length >= 3 && klein.includes(eerste))) {
+      return { naam: l.naam, zeker: true, formaat: l.formaat || 'tabel' };
+    }
+  }
+
+  // "EMZ Maarten Paulissen Ordernummer: 24768"
+  const m = t.match(/([A-ZÀ-Þ][\wÀ-ÿ&.'-]*(?:[ ][A-ZÀ-Þ][\wÀ-ÿ&.'-]*){0,3})\s+(?:ordernummer|orderbevestiging|leveringsbon|bestelbon|factuur)/i);
+  if (m) return { naam: poetsBedrijf(m[1]), zeker: false, formaat: 'tabel' };
+
+  // anders: de eerste zinnige regel
+  const regel = t.split('\n').map(r => r.trim())
+    .find(r => r.length > 3 && /[A-Za-zÀ-ÿ]{3}/.test(r) && !/^\d/.test(r));
+  return { naam: (regel || '').slice(0, 40).replace(/[^\wÀ-ÿ&.' -]/g, '').trim(), zeker: false, formaat: 'tabel' };
+}
+
+/** "Van Marcke Orderbevestiging" → "Van Marcke": woorden als
+    orderbevestiging of leveringsbon horen niet bij de bedrijfsnaam. */
+function poetsBedrijf(naam) {
+  const papier = /^(order(bevestiging|nummer)?|bestel(bon|ling)?|leveringsbon|leverbon|factuur|offerte|nota|bon|document|klant|datum)$/i;
+  const woorden = String(naam).trim().split(/\s+/);
+  while (woorden.length > 1 && papier.test(woorden[woorden.length - 1])) woorden.pop();
+  while (woorden.length > 1 && papier.test(woorden[0])) woorden.shift();
+  return woorden.join(' ');
 }
 
 /** Ordernummer uit de kop van een tabel, voor het label van de order. */

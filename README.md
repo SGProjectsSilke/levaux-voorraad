@@ -8,7 +8,7 @@ Mobiele webapp waarmee Cédric Levaux zijn Cebeo-materiaal in de werkbus bijhoud
 - **Afboeken** — één tik op de min-knop, of een aantal ingeven in het productscherm
 - **Bijbestellen vanaf** — het minimum per product staat in het productscherm zelf, zodat je het instelt op het moment dat je de voorraad ziet
 - **Inboeken** — orders inlezen via schermafbeeldingen (OCR), geplakte tekst of handmatig; bestaande referenties worden **bijgeteld**, niet overschreven
-- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs (EMZ en de meeste andere leveranciers). Je kiest de leverancier bij het inlezen; het soort lijst staat per leverancier ingesteld
+- **Twee soorten orderlijsten** — kaartjes met "Ref Cebeo" (de Cebeo-app) én tabellen met artikelnummer, aantal en prijs. De app herkent zelf welk soort het is en van welke leverancier de bon komt; is die nog niet bekend, dan stelt ze voor hem toe te voegen
 - **Productfoto's** — bij de Cebeo-kaartjes knipt de app de productfoto uit de schermafbeelding en hangt die automatisch aan het product
 - **Eigen materiaal** — foto trekken, naam invullen, klaar; referentie en prijs mogen leeg (de app maakt zelf een referentie zoals `GEDI-001`)
 - **Eenheden** — stuk, m, m², zak, pallet, rol, kg, doos, liter
@@ -105,7 +105,9 @@ Werken twee mensen op exact hetzelfde moment aan hetzelfde product, dan kan éé
 
 Tekstherkenning leest een tabel kolom per kolom als je haar haar gang laat gaan: eerst alle artikelnummers, dan alle namen, dan alle aantallen. Daarmee valt niet meer te achterhalen welk aantal bij welke regel hoort. Daarom zet de app de herkenning in "één blok"-modus (`tessedit_pageseg_mode = 6`) zodra de leverancier op **tabel** staat. Voor de Cebeo-kaartjes werkt de automatische modus juist beter.
 
-Dat is de reden dat elke leverancier een veld `formaat` heeft. Klopt de herkenning niet, dan is dat het eerste om te controleren.
+Daarom leest de app eerst in de gewone modus. Vindt ze geen "Ref Cebeo"-kaartjes, dan leest ze dezelfde afbeeldingen nog eens in blokmodus en probeert ze de tabelparser. Dat kost wat extra tijd bij tabellen, maar je hoeft vooraf niets in te stellen.
+
+De leverancier wordt uit de tekst afgeleid: eerst op "Ref Cebeo", dan op de namen die je al kent, en anders op de naam die boven het ordernummer staat. Op het controlescherm kan je die altijd nog wijzigen of als nieuwe leverancier toevoegen.
 
 ## Over de tekstherkenning
 

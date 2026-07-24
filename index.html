@@ -53,12 +53,7 @@
   <section class="scherm" id="scherm-inboeken" hidden>
     <div class="paneel">
       <h3>Bestelbon inlezen</h3>
-      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
-      <div class="veld">
-        <label for="import-lev">Van welke leverancier?</label>
-        <select id="import-lev"></select>
-        <div class="veld__hulp" id="import-lev-hulp"></div>
-      </div>
+      <p>Maak schermafbeeldingen van je bestelbon of orderbevestiging en laad ze hier op. De app zoekt zelf uit van welke leverancier de bon komt. Bestaande producten worden <strong>bijgeteld</strong>, nieuwe komen erbij.</p>
       <label class="dropzone" for="ocr-bestanden">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L8 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-4l-1.5-2Z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <strong>Schermafbeeldingen kiezen</strong>
@@ -93,6 +88,20 @@
     <div class="waarschuwing" id="controle-waarschuwing">
       Kijk de regels na voor je ze bevestigt. Ingelezen tekst is niet altijd perfect.
     </div>
+    <div class="paneel" id="controle-lev-paneel">
+      <div class="veld" style="margin:0">
+        <label for="controle-lev">Leverancier</label>
+        <select id="controle-lev"></select>
+        <div class="veld__hulp" id="controle-lev-hulp"></div>
+      </div>
+      <div id="controle-lev-nieuw" hidden style="margin-top:12px">
+        <div class="veld"><label for="controle-lev-naam">Naam van de leverancier</label>
+          <input type="text" id="controle-lev-naam"></div>
+        <div class="veld" style="margin-bottom:0"><label for="controle-lev-cat">Categorie voor zijn materiaal</label>
+          <select id="controle-lev-cat"></select></div>
+      </div>
+    </div>
+
     <div id="controle-regels"></div>
     <div class="knoppen" style="margin-top:14px">
       <button class="knop" id="btn-bevestig-import">Toevoegen aan voorraad</button>

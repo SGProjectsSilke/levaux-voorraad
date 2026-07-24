@@ -3,7 +3,7 @@
    =========================================================== */
 
 import { Store, VERSIE, normRef, fuzzKey, HOOFDCATEGORIEEN, EENHEDEN, labelVanCat } from './store.js';
-import { leesAfbeeldingen, parseer, haalFotos, haalOrdernummer } from './ocr.js';
+import { leesAfbeeldingen, herlees, parseer, parseerKaarten, parseerTabel, haalFotos, haalOrdernummer, raadLeverancier } from './ocr.js';
 import { Cloud } from './cloud.js';
 
 const $ = s => document.querySelector(s);
@@ -51,6 +51,8 @@ const ui = {
   importRegels: [],
   importLabel: 'Order',
   importLev: 'Cebeo',
+  importLevNieuw: false,
+  importFormaat: 'cebeo',
   importFotos: new Map()
 };
 
@@ -98,7 +100,6 @@ function tekenAlles() {
   tekenBestellen();
   tekenHistoriek();
   tekenLeveranciers();
-  tekenImportKeuze();
   tekenBadge();
   tekenOpslag();
 }
@@ -454,11 +455,6 @@ function verkleinFoto(bestand) {
    =========================================================== */
 
 function bindInboeken() {
-  $('#import-lev').addEventListener('change', e => {
-    ui.importLev = e.target.value;
-    toonImportHulp();
-  });
-
   $('#ocr-bestanden').addEventListener('change', async e => {
     const bestanden = [...e.target.files];
     e.target.value = '';
@@ -470,18 +466,34 @@ function bindInboeken() {
       $('#ocr-status').textContent = tekst;
     };
 
-    const formaat = Store.formaatVanLeverancier(ui.importLev);
     try {
-      const { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang, { formaat });
-      let regels = parseer(tekst, formaat);
+      // Eerste poging: gewone leesmodus. Die is het beste voor de
+      // kaartjeslijst van Cebeo.
+      let { tekst, paginas } = await leesAfbeeldingen(bestanden, zetVoortgang);
+      let formaat = 'cebeo';
+      let regels = parseerKaarten(tekst);
+
+      if (!regels.length) {
+        // Geen kaartjes gevonden → het is een tabel, en die moet in
+        // "één blok"-modus gelezen worden.
+        zetVoortgang(8, 'Andere opmaak — even opnieuw lezen…');
+        ({ tekst, paginas } = await herlees(paginas, 'tabel', zetVoortgang));
+        formaat = 'tabel';
+        regels = parseerTabel(tekst);
+      }
+
       $('#ocr-voortgang').hidden = true;
       if (!regels.length) {
-        return melding('Geen productregels herkend. Klopt de leverancier hierboven? Anders kan je de tekst plakken.');
+        return melding('Geen productregels herkend. Probeer scherpere afbeeldingen, of plak de tekst.');
       }
-      // productfoto's uit de kaartjes knippen (enkel de Cebeo-opmaak heeft die)
+
+      const geraden = raadLeverancier(tekst, Store.leveranciers());
+      ui.importLev = geraden.naam;
+      ui.importLevNieuw = !Store.leverancier(geraden.naam);
+      ui.importFormaat = formaat;
       ui.importFotos = formaat === 'cebeo' ? haalFotos(paginas) : new Map();
       const nr = haalOrdernummer(tekst);
-      ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
+      ui.importLabel = `${geraden.naam} ${nr || new Date().toLocaleDateString('nl-BE')}`;
       toonControle(regels);
     } catch (err) {
       $('#ocr-voortgang').hidden = true;
@@ -491,13 +503,26 @@ function bindInboeken() {
 
   $('#btn-plak').addEventListener('click', () => {
     const tekst = $('#plak-tekst').value;
-    const regels = parseer(tekst, Store.formaatVanLeverancier(ui.importLev));
+    const kaarten = parseerKaarten(tekst);
+    const regels = kaarten.length ? kaarten : parseerTabel(tekst);
     if (!regels.length) return melding('Geen regels herkend in die tekst.');
+    const geraden = raadLeverancier(tekst, Store.leveranciers());
+    ui.importLev = geraden.naam;
+    ui.importLevNieuw = !Store.leverancier(geraden.naam);
+    ui.importFormaat = kaarten.length ? 'cebeo' : 'tabel';
     ui.importFotos = new Map();
     const nr = haalOrdernummer(tekst);
-    ui.importLabel = `${ui.importLev} ${nr || new Date().toLocaleDateString('nl-BE')}`;
+    ui.importLabel = `${geraden.naam} ${nr || new Date().toLocaleDateString('nl-BE')}`;
     toonControle(regels);
   });
+
+  // leverancier op het controlescherm
+  $('#controle-lev').addEventListener('change', e => {
+    ui.importLevNieuw = e.target.value === '__nieuw';
+    if (!ui.importLevNieuw) ui.importLev = e.target.value;
+    tekenControleLev();
+  });
+  $('#controle-lev-naam').addEventListener('input', e => { ui.importLev = e.target.value.trim(); });
 
   $('#btn-nieuw-product').addEventListener('click', () => openBewerk(null));
   $('#btn-nieuw-foto').addEventListener('click', () => openBewerk(null, true));
@@ -505,8 +530,27 @@ function bindInboeken() {
   $('#btn-annuleer-import').addEventListener('click', () => { ui.importRegels = []; toon('inboeken'); });
 }
 
+function tekenControleLev() {
+  const sel = $('#controle-lev');
+  const bekend = Store.leveranciers().map(l => l.naam);
+  const opties = bekend.map(n =>
+    `<option${!ui.importLevNieuw && n === ui.importLev ? ' selected' : ''}>${ontsnap(n)}</option>`).join('');
+  sel.innerHTML = opties + `<option value="__nieuw"${ui.importLevNieuw ? ' selected' : ''}>+ Nieuwe leverancier toevoegen…</option>`;
+
+  $('#controle-lev-nieuw').hidden = !ui.importLevNieuw;
+  if (ui.importLevNieuw) {
+    if (!$('#controle-lev-naam').value) $('#controle-lev-naam').value = ui.importLev;
+    $('#controle-lev-cat').innerHTML = HOOFDCATEGORIEEN.map(c =>
+      `<option value="${c.key}">${c.label}</option>`).join('');
+    $('#controle-lev-hulp').textContent = 'Deze leverancier kende de app nog niet. Kijk de naam na en kies waar zijn materiaal onder valt.';
+  } else {
+    $('#controle-lev-hulp').textContent = 'Herkend op de bon. Klopt het niet, kies dan hier de juiste.';
+  }
+}
+
 function toonControle(regels) {
   ui.importRegels = regels;
+  tekenControleLev();
   const el = $('#controle-regels');
   el.innerHTML = '';
   // fotokolom enkel tonen als er effectief foto's zijn (tabellen hebben er geen)
@@ -569,6 +613,15 @@ function toonControle(regels) {
 async function bevestigImport() {
   const regels = ui.importRegels.filter(r => r.qty > 0);
   if (!regels.length) return melding('Er staat niets meer in de lijst.');
+
+  if (ui.importLevNieuw) {
+    const naam = $('#controle-lev-naam').value.trim();
+    if (!naam) return melding('Geef de leverancier een naam.');
+    await Store.voegLeverancierToe(naam, $('#controle-lev-cat').value, ui.importFormaat);
+    ui.importLev = naam;
+    ui.importLevNieuw = false;
+  }
+
   const { bij, nieuw } = await Store.boekOrderIn(regels, ui.importLabel, ui.importLev);
   ui.importRegels = [];
   $('#plak-tekst').value = '';
@@ -789,22 +842,6 @@ function tekenOpslag() {
   const pct = Store.opslagGebruik();
   el.innerHTML = `<div class="balk" style="margin:0 0 6px"><i style="width:${Math.max(pct, 1)}%;background:${pct > 80 ? 'var(--rood)' : 'var(--zwart)'}"></i></div>
     <div class="veld__hulp" style="margin:0">Opslag op dit toestel: ${pct < 1 ? 'minder dan 1' : pct}% gebruikt${pct > 80 ? ' — tijd voor een back-up en minder foto’s.' : '.'}</div>`;
-}
-
-function tekenImportKeuze() {
-  const sel = $('#import-lev');
-  if (!sel) return;
-  const namen = Store.leveranciers().map(l => l.naam);
-  if (!namen.includes(ui.importLev)) ui.importLev = namen[0] || '';
-  sel.innerHTML = namen.map(n => `<option${n === ui.importLev ? ' selected' : ''}>${ontsnap(n)}</option>`).join('');
-  toonImportHulp();
-}
-
-function toonImportHulp() {
-  const l = Store.leverancier(ui.importLev);
-  $('#import-lev-hulp').textContent = l?.formaat === 'cebeo'
-    ? 'Kaartjes met "Ref Cebeo" — de app haalt hier ook de productfoto\'s uit.'
-    : 'Tabel met artikelnummer, aantal en prijs naast elkaar.';
 }
 
 function tekenLeveranciers() {
